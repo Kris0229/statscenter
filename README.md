@@ -3,7 +3,7 @@
 多租戶的棒壘聯盟成績管理平台。技術規格詳見 [`BUILD_SPEC.md`](./BUILD_SPEC.md);
 免費雲端部署手冊詳見 [`DEPLOY.md`](./DEPLOY.md)。
 
-**目前進度:Phase 1.5 — System admin & tenant isolation**
+**目前進度:Phase 2 — Auth, accounts, teams, roster(含 Excel 匯入)**
 
 ---
 
@@ -93,7 +93,7 @@ cd frontend && npm test
 - [x] **Phase 0** — Scaffold & infra
 - [x] **Phase 1** — Data model & migrations
 - [x] **Phase 1.5** — System admin & tenant isolation
-- [ ] Phase 2 — Auth, accounts, teams, roster (含 Excel 匯入)
+- [x] **Phase 2** — Auth, accounts, teams, roster (含 Excel 匯入)
 - [ ] Phase 3 — Score entry + validation + finalize
 - [ ] Phase 4 — Leaderboards & player records
 - [ ] Phase 5 — Boxscore

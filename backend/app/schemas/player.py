@@ -13,3 +13,16 @@ class PlayerOut(BaseModel):
     status: str
 
     model_config = {"from_attributes": True}
+
+
+class PlayerCreate(BaseModel):
+    name: str
+    number: int
+    positions: str | None = None
+    bats: str | None = None
+    throws: str | None = None
+    user_id: int | None = None
+
+
+class PlayerPhotoUpdate(BaseModel):
+    photo_url: str

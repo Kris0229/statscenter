@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.core.errors import ApiError
 from app.core.security import (
     TokenError,
@@ -12,6 +13,7 @@ from app.core.security import (
 from app.db.session import get_db
 from app.models import User
 from app.schemas.auth import AccessTokenResponse, LoginRequest, RefreshRequest, TokenResponse
+from app.schemas.user import UserOut
 
 router = APIRouter(tags=["auth"])
 
@@ -46,3 +48,8 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> AccessTok
     return AccessTokenResponse(
         access_token=create_access_token(user_id=user.id, role=user.role, league_id=user.league_id),
     )
+
+
+@router.get("/me", response_model=UserOut)
+def me(user: User = Depends(get_current_user)) -> User:
+    return user
