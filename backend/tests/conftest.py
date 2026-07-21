@@ -3,11 +3,16 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401  (register models on Base.metadata)
 from app.core.config import get_settings
+from app.core.security import create_access_token, hash_password
+from app.db.session import get_db as get_db_dependency
+from app.main import app as fastapi_app
+from app.models import League, User
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -62,3 +67,52 @@ def db_session(db_engine, migrated_schema):
         session.close()
         trans.rollback()
         connection.close()
+
+
+@pytest.fixture
+def client(db_session):
+    """TestClient wired to the test's own rolled-back db_session, so writes
+    made through ORM helpers in a test are visible to the API and vice versa.
+    """
+
+    def _override_get_db():
+        yield db_session
+
+    fastapi_app.dependency_overrides[get_db_dependency] = _override_get_db
+    try:
+        yield TestClient(fastapi_app)
+    finally:
+        fastapi_app.dependency_overrides.pop(get_db_dependency, None)
+
+
+def make_league(db_session, name: str = "Test League", slug: str = "test-league") -> League:
+    league = League(name=name, slug=slug)
+    db_session.add(league)
+    db_session.flush()
+    return league
+
+
+def make_user(
+    db_session,
+    *,
+    email: str,
+    role: str,
+    league_id: int | None,
+    password: str = "TestPass123!",
+    display_name: str = "Test User",
+) -> User:
+    user = User(
+        email=email,
+        role=role,
+        league_id=league_id,
+        password_hash=hash_password(password),
+        display_name=display_name,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def auth_headers(user: User) -> dict[str, str]:
+    token = create_access_token(user_id=user.id, role=user.role, league_id=user.league_id)
+    return {"Authorization": f"Bearer {token}"}
