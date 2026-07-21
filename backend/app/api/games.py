@@ -14,6 +14,7 @@ from app.schemas.game import GameCreate, GameOut, GameUpdate
 from app.schemas.pitching import PitchingLineOut, PitchingLinesUpsert
 from app.schemas.validate import ValidateCheck, ValidateResult
 from app.services.game_validation import overall_ok, run_validation_checks
+from app.services.materialized_views import refresh_leaderboard_views
 
 router = APIRouter(tags=["games"])
 
@@ -297,8 +298,7 @@ def finalize_game(
             before={"status": before_status}, after={"status": "final"}, actor_id=admin.id,
         ),
     )
-    # TODO(confirm): Phase 4 adds mv_batting_season/mv_pitching_season (§3.1);
-    # once they exist, REFRESH MATERIALIZED VIEW CONCURRENTLY here.
+    refresh_leaderboard_views(db)
     db.commit()
     db.refresh(game)
     return game

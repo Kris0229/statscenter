@@ -1,4 +1,5 @@
 from app.models import BattingLine, Game, Player, Season, Team
+from app.services.materialized_views import refresh_leaderboard_views
 from tests.conftest import auth_headers, make_league, make_user
 
 
@@ -8,7 +9,7 @@ def _make_full_league(db_session, suffix: str) -> dict:
         db_session, email=f"admin@league-{suffix.lower()}.test", role="admin",
         league_id=league.id,
     )
-    season = Season(league_id=league.id, year=2026, name="2026")
+    season = Season(league_id=league.id, year=2026, name="2026", is_current=True)
     home = Team(league_id=league.id, name=f"{suffix} Home")
     away = Team(league_id=league.id, name=f"{suffix} Away")
     db_session.add_all([season, home, away])
@@ -27,6 +28,12 @@ def _make_full_league(db_session, suffix: str) -> dict:
 
     batting = BattingLine(game_id=game.id, player_id=player.id, pa=4, ab=4, h=2, hr=1)
     db_session.add(batting)
+    db_session.flush()
+
+    # This test suite creates 'final' games directly via the ORM, bypassing
+    # the /finalize endpoint that normally triggers this — so the MVs backing
+    # leaderboard reads need an explicit refresh to see the new rows.
+    refresh_leaderboard_views(db_session)
     db_session.flush()
 
     return {
