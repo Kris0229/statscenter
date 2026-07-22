@@ -10,9 +10,11 @@ from app.core.errors import ApiError
 from app.db.session import get_db
 from app.models import AuditLog, BattingLine, Game, PitchingLine, Player, Season, Team, User
 from app.schemas.batting import BattingLineOut, BattingLinesUpsert
+from app.schemas.boxscore import BoxscoreOut
 from app.schemas.game import GameCreate, GameOut, GameUpdate
 from app.schemas.pitching import PitchingLineOut, PitchingLinesUpsert
 from app.schemas.validate import ValidateCheck, ValidateResult
+from app.services.boxscore import build_boxscore
 from app.services.game_validation import overall_ok, run_validation_checks
 from app.services.materialized_views import refresh_leaderboard_views
 
@@ -302,3 +304,15 @@ def finalize_game(
     db.commit()
     db.refresh(game)
     return game
+
+
+@router.get("/games/{game_id}/boxscore", response_model=BoxscoreOut)
+def get_boxscore(
+    game_id: int,
+    db: Session = Depends(get_db),
+    league_id: int = Depends(get_current_league_id),
+) -> dict:
+    # Read-only and available to every league role (admin/power/user) per §2 —
+    # unlike score entry/finalize, viewing a boxscore isn't admin-only.
+    game = _get_game_or_404(db, game_id, league_id)
+    return build_boxscore(db, game)

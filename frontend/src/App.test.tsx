@@ -1,17 +1,40 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { App } from "./App";
+import { AuthProvider } from "./auth/AuthContext";
+
+afterEach(() => {
+  localStorage.clear();
+});
+
+function renderApp(initialPath: string) {
+  const client = new QueryClient();
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter
+        initialEntries={[initialPath]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe("App", () => {
-  it("renders the app title", () => {
-    const client = new QueryClient();
-    render(
-      <QueryClientProvider client={client}>
-        <App />
-      </QueryClientProvider>,
-    );
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("棒壘聯盟成績管理系統");
+  it("redirects an unauthenticated visitor to the login page", () => {
+    renderApp("/games");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("登入");
+  });
+
+  it("shows the login form fields", () => {
+    renderApp("/login");
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByLabelText("密碼")).toBeInTheDocument();
   });
 });

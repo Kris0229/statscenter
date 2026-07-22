@@ -8,12 +8,14 @@ line_score), away batting r=5, away pitching r=3 (=home batting r), home
 pitching r=5 (=away batting r), and both pitchers go the full 7 innings
 (21 outs each, 42 total) so even the outs-approximation warning is clean.
 """
+from datetime import date
+
 from app.models import Game, Player, Season, Team
 from tests.conftest import make_league, make_user
 
 # (number, name, ab, bb, h, b2, b3, hr, r, rbi, so)
 _HOME_BATTERS = [
-    (1, "巨人1", 4, 0, 2, 1, 0, 0, 1, 1, 1),
+    (1, "巨人先發", 4, 0, 2, 1, 0, 0, 1, 1, 1),  # also pitches (two-way, see HOME_PITCHER)
     (2, "巨人2", 4, 0, 1, 0, 0, 0, 0, 0, 1),
     (3, "巨人3", 4, 0, 1, 0, 0, 0, 1, 1, 0),
     (4, "巨人4", 3, 1, 1, 0, 0, 1, 1, 2, 1),
@@ -24,7 +26,7 @@ _HOME_BATTERS = [
     (9, "巨人9", 3, 1, 0, 0, 0, 0, 0, 0, 1),
 ]
 _AWAY_BATTERS = [
-    (1, "運動家1", 4, 0, 2, 1, 0, 0, 1, 1, 1),
+    (1, "李耀明", 4, 0, 2, 1, 0, 0, 1, 1, 1),  # also pitches (two-way, see AWAY_PITCHER)
     (2, "運動家2", 4, 0, 1, 0, 0, 0, 1, 0, 0),
     (3, "運動家3", 4, 0, 2, 0, 0, 1, 1, 2, 1),
     (4, "運動家4", 4, 0, 1, 0, 0, 0, 0, 1, 1),
@@ -39,11 +41,11 @@ _AWAY_BATTERS = [
 # away batting sums: ab=34 bb=2 h=11 r=5 so=7 hr=1
 
 HOME_PITCHER = dict(
-    name="巨人先發", outs=21, h=11, r=5, er=5, bb=2, so=7, hr=1, ab=34,
+    outs=21, h=11, r=5, er=5, bb=2, so=7, hr=1, ab=34,
     decision="L", cg=True, gs=True, sho=False, sv=False, svo=False, wp=0, hp=0, np=112,
 )
 AWAY_PITCHER = dict(
-    name="李耀明", outs=21, h=9, r=3, er=3, bb=2, so=10, hr=1, ab=34,
+    outs=21, h=9, r=3, er=3, bb=2, so=10, hr=1, ab=34,
     decision="W", cg=True, gs=True, sho=False, sv=False, svo=False, wp=0, hp=0, np=101,
 )
 
@@ -79,7 +81,7 @@ def build_rtba_game(db_session, suffix: str = "RTBA") -> dict:
     away_players = _make_players(_AWAY_BATTERS, away_team)
 
     game = Game(
-        league_id=league.id, season_id=season.id, game_date="2026-05-01",
+        league_id=league.id, season_id=season.id, game_date=date(2026, 5, 1),
         home_team_id=home_team.id, away_team_id=away_team.id, code="G6",
     )
     db_session.add(game)
@@ -106,11 +108,7 @@ def build_rtba_game(db_session, suffix: str = "RTBA") -> dict:
         "game": game,
         "home_batting_payload": _batting_payload(_HOME_BATTERS, home_players),
         "away_batting_payload": _batting_payload(_AWAY_BATTERS, away_players),
-        "home_pitching_payload": [
-            {"player_id": home_players[0].id, **{k: v for k, v in HOME_PITCHER.items() if k != "name"}},
-        ],
-        "away_pitching_payload": [
-            {"player_id": away_players[0].id, **{k: v for k, v in AWAY_PITCHER.items() if k != "name"}},
-        ],
+        "home_pitching_payload": [{"player_id": home_players[0].id, **HOME_PITCHER}],
+        "away_pitching_payload": [{"player_id": away_players[0].id, **AWAY_PITCHER}],
         "line_score": LINE_SCORE,
     }
