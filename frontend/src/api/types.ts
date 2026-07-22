@@ -75,3 +75,103 @@ export interface Boxscore {
   home: BoxscoreTeamSide;
   away: BoxscoreTeamSide;
 }
+
+export interface Season {
+  id: number;
+  year: number;
+  name: string;
+  innings_per_game: number;
+  pa_qualifier_factor: string;
+  ip_qualifier_factor: string;
+  is_current: boolean;
+}
+
+export interface Player {
+  id: number;
+  team_id: number;
+  name: string;
+  number: number;
+  positions: string | null;
+  bats: string | null;
+  throws: string | null;
+  photo_url: string | null;
+  status: string;
+}
+
+export interface BattingLine {
+  player_id: number;
+  bat_order: number | null;
+  sub_index: number;
+  pos: string | null;
+  pa: number;
+  ab: number;
+  sh: number;
+  sf: number;
+  bb: number;
+  hp: number;
+  io: number;
+  tie: number;
+  r: number;
+  h: number;
+  b2: number;
+  b3: number;
+  hr: number;
+  rbi: number;
+  so: number;
+  sb: number;
+  cs: number;
+  gidp: number;
+  e: number;
+}
+
+export interface PitchingLine {
+  player_id: number;
+  seq: number;
+  decision: string;
+  outs: number;
+  np: number;
+  bf: number;
+  ab: number;
+  h: number;
+  hr: number;
+  bb: number;
+  hp: number;
+  so: number;
+  r: number;
+  er: number;
+  wp: number;
+  gs: boolean;
+  cg: boolean;
+  sho: boolean;
+  sv: boolean;
+  svo: boolean;
+}
+
+export interface ValidateCheck {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface ValidateResult {
+  ok: boolean;
+  checks: ValidateCheck[];
+}
+
+export interface GameLineScore {
+  home: number[];
+  away: number[];
+  home_e?: number;
+  away_e?: number;
+  home_lob?: number;
+  away_lob?: number;
+}
+
+export interface GameCreateInput {
+  season_id: number;
+  game_date: string;
+  venue?: string;
+  code?: string;
+  home_team_id: number;
+  away_team_id: number;
+}

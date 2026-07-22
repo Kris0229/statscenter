@@ -8,7 +8,10 @@ export function GamesListPage() {
 
   return (
     <div>
-      <h1>賽程</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1>賽程</h1>
+        <Link to="/games/new">+ 新增比賽</Link>
+      </div>
       {isLoading && <p>載入中…</p>}
       {isError && <p style={{ color: "crimson" }}>無法載入賽程</p>}
       {data && data.length === 0 && <p>目前沒有比賽。</p>}
@@ -20,6 +23,7 @@ export function GamesListPage() {
               <th style={thStyle}>賽事代碼</th>
               <th style={thStyle}>狀態</th>
               <th style={thStyle}></th>
+              <th style={thStyle}></th>
             </tr>
           </thead>
           <tbody>
@@ -28,6 +32,9 @@ export function GamesListPage() {
                 <td style={tdStyle}>{game.game_date}</td>
                 <td style={tdStyle}>{game.code ?? "—"}</td>
                 <td style={tdStyle}>{game.status}</td>
+                <td style={tdStyle}>
+                  <Link to={`/games/${game.id}/score-entry`}>計分</Link>
+                </td>
                 <td style={tdStyle}>
                   <Link to={`/games/${game.id}/boxscore`}>比賽紀錄表</Link>
                 </td>

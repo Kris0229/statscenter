@@ -156,6 +156,39 @@ def _snapshot_lines(lines: list, fields: list[str]) -> list[dict]:
     return [{f: getattr(line, f) for f in fields} for line in lines]
 
 
+@router.get("/games/{game_id}/batting", response_model=list[BattingLineOut])
+def get_batting_lines(
+    game_id: int,
+    db: Session = Depends(get_db),
+    league_id: int = Depends(get_current_league_id),
+) -> list[BattingLine]:
+    """All batting lines for the game (both teams) — read-back for the
+    score-entry UI (Phase 6) to re-hydrate its grid, e.g. after a reload.
+    """
+    game = _get_game_or_404(db, game_id, league_id)
+    return (
+        db.query(BattingLine)
+        .filter(BattingLine.game_id == game.id)
+        .order_by(BattingLine.bat_order, BattingLine.sub_index)
+        .all()
+    )
+
+
+@router.get("/games/{game_id}/pitching", response_model=list[PitchingLineOut])
+def get_pitching_lines(
+    game_id: int,
+    db: Session = Depends(get_db),
+    league_id: int = Depends(get_current_league_id),
+) -> list[PitchingLine]:
+    game = _get_game_or_404(db, game_id, league_id)
+    return (
+        db.query(PitchingLine)
+        .filter(PitchingLine.game_id == game.id)
+        .order_by(PitchingLine.seq)
+        .all()
+    )
+
+
 @router.put("/games/{game_id}/batting", response_model=list[BattingLineOut])
 def put_batting_lines(
     game_id: int,

@@ -247,3 +247,34 @@ def test_create_game_and_list_filters(client, db_session) -> None:
 
     scheduled_resp = client.get("/api/v1/games?status=scheduled", headers=auth_headers(admin))
     assert all(g["status"] == "scheduled" for g in scheduled_resp.json())
+
+
+def test_batting_and_pitching_lines_round_trip_via_get(client, db_session) -> None:
+    fixture = build_rtba_game(db_session, "ReadBack")
+    _enter_full_game(client, fixture)
+    game_id = fixture["game"].id
+    admin = fixture["admin"]
+
+    batting_resp = client.get(f"/api/v1/games/{game_id}/batting", headers=auth_headers(admin))
+    assert batting_resp.status_code == 200
+    batting_lines = batting_resp.json()
+    assert len(batting_lines) == 18  # 9 home + 9 away
+    home_player_ids = {p.id for p in fixture["home_players"]}
+    away_player_ids = {p.id for p in fixture["away_players"]}
+    assert {line["player_id"] for line in batting_lines} == home_player_ids | away_player_ids
+
+    pitching_resp = client.get(f"/api/v1/games/{game_id}/pitching", headers=auth_headers(admin))
+    assert pitching_resp.status_code == 200
+    pitching_lines = pitching_resp.json()
+    assert len(pitching_lines) == 2
+    assert {line["decision"] for line in pitching_lines} == {"W", "L"}
+
+
+def test_get_batting_lines_cross_tenant_is_404(client, db_session) -> None:
+    fixture_a = build_rtba_game(db_session, "ReadBackA")
+    fixture_b = build_rtba_game(db_session, "ReadBackB")
+
+    resp = client.get(
+        f"/api/v1/games/{fixture_b['game'].id}/batting", headers=auth_headers(fixture_a["admin"]),
+    )
+    assert resp.status_code == 404

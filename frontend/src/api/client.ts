@@ -1,4 +1,15 @@
-import type { Boxscore, Game } from "./types";
+import type {
+  BattingLine,
+  Boxscore,
+  Game,
+  GameCreateInput,
+  GameLineScore,
+  PitchingLine,
+  Player,
+  Season,
+  Team,
+  ValidateResult,
+} from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
 const TOKEN_KEY = "sc_access_token";
@@ -102,4 +113,73 @@ export function fetchGames(): Promise<Game[]> {
 
 export function fetchBoxscore(gameId: number): Promise<Boxscore> {
   return apiFetch<Boxscore>(`/games/${gameId}/boxscore`);
+}
+
+export function fetchGame(gameId: number): Promise<Game> {
+  return apiFetch<Game>(`/games/${gameId}`);
+}
+
+export function fetchSeasons(): Promise<Season[]> {
+  return apiFetch<Season[]>("/seasons");
+}
+
+export function fetchTeams(): Promise<Team[]> {
+  return apiFetch<Team[]>("/teams");
+}
+
+export function fetchTeam(teamId: number): Promise<Team> {
+  return apiFetch<Team>(`/teams/${teamId}`);
+}
+
+export function fetchTeamPlayers(teamId: number): Promise<Player[]> {
+  return apiFetch<Player[]>(`/teams/${teamId}/players`);
+}
+
+export function createGame(input: GameCreateInput): Promise<Game> {
+  return apiFetch<Game>("/games", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function patchGameLineScore(gameId: number, lineScore: GameLineScore): Promise<Game> {
+  return apiFetch<Game>(`/games/${gameId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ line_score: lineScore }),
+  });
+}
+
+export function fetchBattingLines(gameId: number): Promise<BattingLine[]> {
+  return apiFetch<BattingLine[]>(`/games/${gameId}/batting`);
+}
+
+export function fetchPitchingLines(gameId: number): Promise<PitchingLine[]> {
+  return apiFetch<PitchingLine[]>(`/games/${gameId}/pitching`);
+}
+
+export function putBattingLines(
+  gameId: number,
+  teamId: number,
+  lines: BattingLine[],
+): Promise<BattingLine[]> {
+  return apiFetch<BattingLine[]>(`/games/${gameId}/batting`, {
+    method: "PUT",
+    body: JSON.stringify({ team_id: teamId, lines }),
+  });
+}
+
+export function putPitchingLines(
+  gameId: number,
+  teamId: number,
+  lines: PitchingLine[],
+): Promise<PitchingLine[]> {
+  return apiFetch<PitchingLine[]>(`/games/${gameId}/pitching`, {
+    method: "PUT",
+    body: JSON.stringify({ team_id: teamId, lines }),
+  });
+}
+
+export function validateGame(gameId: number): Promise<ValidateResult> {
+  return apiFetch<ValidateResult>(`/games/${gameId}/validate`, { method: "POST" });
+}
+
+export function finalizeGame(gameId: number): Promise<Game> {
+  return apiFetch<Game>(`/games/${gameId}/finalize`, { method: "POST" });
 }
