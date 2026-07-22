@@ -4,15 +4,25 @@ import type {
   Game,
   GameCreateInput,
   GameLineScore,
+  Media,
   PitchingLine,
   Player,
+  Report,
+  ReportHighlights,
   Season,
   Team,
   ValidateResult,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
 const TOKEN_KEY = "sc_access_token";
+
+/** Local-storage media URLs come back origin-relative (e.g. "/media/x.jpg");
+ * Supabase/S3-backed ones are already absolute. */
+export function resolveMediaUrl(url: string): string {
+  return /^https?:\/\//.test(url) ? url : `${API_ORIGIN}${url}`;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -40,7 +50,11 @@ export function clearToken(): void {
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
+  // FormData sets its own multipart boundary in the Content-Type header —
+  // overriding it here would break the upload.
+  if (!(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
@@ -182,4 +196,79 @@ export function validateGame(gameId: number): Promise<ValidateResult> {
 
 export function finalizeGame(gameId: number): Promise<Game> {
   return apiFetch<Game>(`/games/${gameId}/finalize`, { method: "POST" });
+}
+
+export function fetchGameMedia(gameId: number): Promise<Media[]> {
+  return apiFetch<Media[]>(`/media?game_id=${gameId}`);
+}
+
+export function uploadPhoto(gameId: number, file: File): Promise<Media> {
+  const form = new FormData();
+  form.set("type", "photo");
+  form.set("game_id", String(gameId));
+  form.set("file", file);
+  return apiFetch<Media>("/media", { method: "POST", body: form });
+}
+
+export function uploadMediaLink(
+  gameId: number,
+  type: "video" | "link",
+  url: string,
+): Promise<Media> {
+  const form = new FormData();
+  form.set("type", type);
+  form.set("game_id", String(gameId));
+  form.set("url", url);
+  return apiFetch<Media>("/media", { method: "POST", body: form });
+}
+
+export function updateMediaStatus(mediaId: number, status: "active" | "inactive"): Promise<Media> {
+  return apiFetch<Media>(`/media/${mediaId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function deleteMedia(mediaId: number): Promise<void> {
+  return apiFetch<void>(`/media/${mediaId}`, { method: "DELETE" });
+}
+
+export function fetchReportHighlights(gameId: number): Promise<ReportHighlights> {
+  return apiFetch<ReportHighlights>(`/games/${gameId}/report-highlights`);
+}
+
+export function fetchReportsForGame(gameId: number): Promise<Report[]> {
+  return apiFetch<Report[]>(`/reports?game_id=${gameId}`);
+}
+
+export function fetchReport(reportId: number): Promise<Report> {
+  return apiFetch<Report>(`/reports/${reportId}`);
+}
+
+export interface ReportCreateInput {
+  game_id: number;
+  title?: string;
+  content?: string;
+  cover_media_id?: number;
+}
+
+export function createReport(input: ReportCreateInput): Promise<Report> {
+  return apiFetch<Report>("/reports", { method: "POST", body: JSON.stringify(input) });
+}
+
+export interface ReportUpdateInput {
+  title?: string;
+  content?: string;
+  cover_media_id?: number | null;
+}
+
+export function updateReport(reportId: number, input: ReportUpdateInput): Promise<Report> {
+  return apiFetch<Report>(`/reports/${reportId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function publishReport(reportId: number): Promise<Report> {
+  return apiFetch<Report>(`/reports/${reportId}/publish`, { method: "POST" });
 }

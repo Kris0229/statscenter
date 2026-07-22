@@ -175,3 +175,44 @@ export interface GameCreateInput {
   home_team_id: number;
   away_team_id: number;
 }
+
+export interface Media {
+  id: number;
+  game_id: number | null;
+  player_id: number | null;
+  uploader_id: number;
+  type: "photo" | "video" | "link";
+  url: string;
+  status: string;
+  created_at: string;
+}
+
+export interface ReportHighlightEntry {
+  player: string;
+  count?: number;
+  hits?: number;
+  so?: number;
+}
+
+export interface ReportHighlights {
+  home_team_name: string;
+  away_team_name: string;
+  home_score: number;
+  away_score: number;
+  winning_pitcher: string | null;
+  losing_pitcher: string | null;
+  save_pitcher: string | null;
+  home_runs: ReportHighlightEntry[];
+  multi_hit_batters: ReportHighlightEntry[];
+  big_strikeout_pitchers: ReportHighlightEntry[];
+}
+
+export interface Report {
+  id: number;
+  game_id: number;
+  title: string;
+  content: string | null;
+  cover_media_id: number | null;
+  author_id: number;
+  published_at: string | null;
+}

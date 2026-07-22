@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     STORAGE_BACKEND: str = "local"
     SUPABASE_URL: str | None = None
     SUPABASE_SERVICE_KEY: str | None = None
+    SUPABASE_STORAGE_BUCKET: str = "media"
+    MEDIA_LOCAL_DIR: str = "media"
+    MEDIA_MAX_BYTES: int = 8 * 1024 * 1024
 
     SUPERADMIN_EMAIL: str | None = None
     SUPERADMIN_PASSWORD: str | None = None

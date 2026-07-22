@@ -6,6 +6,7 @@ import { BoxscorePage } from "./pages/BoxscorePage";
 import { GamesListPage } from "./pages/GamesListPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NewGamePage } from "./pages/NewGamePage";
+import { ReportPage } from "./pages/ReportPage";
 import { ScoreEntryPage } from "./pages/ScoreEntryPage";
 
 export function App() {
@@ -23,6 +24,7 @@ export function App() {
         <Route path="/games/new" element={<NewGamePage />} />
         <Route path="/games/:gameId/score-entry" element={<ScoreEntryPage />} />
         <Route path="/games/:gameId/boxscore" element={<BoxscorePage />} />
+        <Route path="/reports/:reportId" element={<ReportPage />} />
         <Route path="/" element={<Navigate to="/games" replace />} />
       </Route>
     </Routes>

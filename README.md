@@ -3,7 +3,7 @@
 多租戶的棒壘聯盟成績管理平台。技術規格詳見 [`BUILD_SPEC.md`](./BUILD_SPEC.md);
 免費雲端部署手冊詳見 [`DEPLOY.md`](./DEPLOY.md)。
 
-**目前進度:Phase 6 — Score-entry UI**
+**目前進度:Phase 7 — Media & reports(`BUILD_SPEC.md` §7 全部完成)**
 
 ---
 
@@ -55,8 +55,12 @@ npm run dev
 
 前端需要登入才能使用:`/games` 賽程列表、`/games/new` 新增比賽、
 `/games/:id/score-entry` 計分表(鍵盤方向鍵可在格子間移動)、
-`/games/:id/boxscore` 比賽紀錄表。本機測試可用 `python -m app.db.seed`
+`/games/:id/boxscore` 比賽紀錄表(含媒體牆上傳、賽後報導產生/發布入口)、
+`/reports/:id` 報導頁面。本機測試可用 `python -m app.db.seed`
 建立的示範帳號,例如 `admin@demo-league-a.demo` / `ChangeMe123!`。
+
+本機媒體上傳預設寫入 `backend/media/`(`STORAGE_BACKEND=local`),
+由後端於 `/media/*` 提供靜態檔案服務。
 
 ---
 
@@ -103,4 +107,4 @@ cd frontend && npm test
 - [x] **Phase 4** — Leaderboards & player records
 - [x] **Phase 5** — Boxscore
 - [x] **Phase 6** — Score-entry UI
-- [ ] Phase 7 — Media & reports
+- [x] **Phase 7** — Media & reports

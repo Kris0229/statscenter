@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { fetchBoxscore } from "../api/client";
+import { createReport, fetchBoxscore, fetchMe, fetchReportsForGame } from "../api/client";
 import type { Boxscore, BoxscoreBattingNotes, BoxscoreTeamSide } from "../api/types";
+import { MediaWall } from "../components/MediaWall";
 import "./BoxscorePage.css";
 
 export function BoxscorePage() {
@@ -50,6 +51,48 @@ function BoxscoreView({ boxscore }: { boxscore: Boxscore }) {
       <BattingTable side={boxscore.home} />
       <BattingNotesView notes={boxscore.home.batting_notes} />
       <PitchingTable side={boxscore.home} />
+
+      <ReportSection gameId={boxscore.game.id} />
+      <MediaWall gameId={boxscore.game.id} />
+    </div>
+  );
+}
+
+function ReportSection({ gameId }: { gameId: number }) {
+  const navigate = useNavigate();
+  const reportsQuery = useQuery({
+    queryKey: ["reports", "game", gameId],
+    queryFn: () => fetchReportsForGame(gameId),
+  });
+  const meQuery = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+
+  async function handleCreate() {
+    const report = await createReport({ game_id: gameId });
+    navigate(`/reports/${report.id}`);
+  }
+
+  const reports = reportsQuery.data ?? [];
+  const isAdmin = meQuery.data?.role === "admin";
+
+  return (
+    <div className="no-print" style={{ marginTop: "2rem" }}>
+      <h2>賽後報導</h2>
+      {reports.length === 0 && <p>尚無報導。</p>}
+      <ul>
+        {reports.map((r) => (
+          <li key={r.id}>
+            <Link to={`/reports/${r.id}`}>
+              {r.title}
+              {!r.published_at && "(草稿)"}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {isAdmin && reports.length === 0 && (
+        <button type="button" onClick={handleCreate}>
+          撰寫賽後報導
+        </button>
+      )}
     </div>
   );
 }
