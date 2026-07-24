@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
-import { ApiError, bootstrapLeagueAdmin, createLeague, fetchLeagues } from "@/api/client";
+import { ApiError, bootstrapLeagueAdmin, createLeague, fetchLeagueAdmins, fetchLeagues } from "@/api/client";
 import { PageHeader } from "@/components/PageHeader";
 import { FormField } from "@/components/FormField";
 import { FormError, FormSuccess } from "@/components/FormStatus";
@@ -77,6 +77,7 @@ export function LeaguesPage() {
       setAdminEmail("");
       setAdminName("");
       setAdminPassword("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "leagues", adminFormLeagueId, "admins"] });
     } catch (err) {
       setAdminError(err instanceof ApiError ? err.message : "指派管理員失敗");
     } finally {
@@ -119,6 +120,7 @@ export function LeaguesPage() {
             <TableHead>名稱</TableHead>
             <TableHead>Slug</TableHead>
             <TableHead>狀態</TableHead>
+            <TableHead>管理員</TableHead>
             <TableHead></TableHead>
           </TableRow>
         </TableHeader>
@@ -129,6 +131,9 @@ export function LeaguesPage() {
               <TableCell>{league.slug}</TableCell>
               <TableCell>
                 <EntityStatusBadge status={league.status} />
+              </TableCell>
+              <TableCell>
+                <LeagueAdminsCell leagueId={league.id} />
               </TableCell>
               <TableCell>
                 <Button
@@ -189,6 +194,27 @@ export function LeaguesPage() {
           </form>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function LeagueAdminsCell({ leagueId }: { leagueId: number }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "leagues", leagueId, "admins"],
+    queryFn: () => fetchLeagueAdmins(leagueId),
+  });
+
+  if (isLoading) return <span className="text-sm text-muted-foreground">載入中…</span>;
+  if (!data || data.length === 0) {
+    return <span className="text-sm text-muted-foreground">尚無管理員</span>;
+  }
+  return (
+    <div className="grid gap-0.5 text-sm">
+      {data.map((admin) => (
+        <span key={admin.id}>
+          {admin.display_name}（{admin.email}）
+        </span>
+      ))}
     </div>
   );
 }

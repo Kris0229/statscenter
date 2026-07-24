@@ -332,6 +332,10 @@ export function bootstrapLeagueAdmin(
   });
 }
 
+export function fetchLeagueAdmins(leagueId: number): Promise<LeagueAdmin[]> {
+  return apiFetch<LeagueAdmin[]>(`/admin/leagues/${leagueId}/admins`);
+}
+
 // --- Teams & roster ---
 
 export interface TeamCreateInput {

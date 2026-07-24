@@ -44,6 +44,32 @@ def test_super_admin_creates_league_and_bootstraps_admin_who_can_log_in(
     assert claims["league_id"] == league_b["id"]
 
 
+def test_super_admin_lists_admins_for_a_league(client, db_session) -> None:
+    super_admin = _make_super_admin(db_session)
+    league = make_league(db_session, name="League C", slug="league-c")
+    other_league = make_league(db_session, name="League D", slug="league-d")
+    make_user(db_session, email="admin1@league-c.test", role="admin", league_id=league.id)
+    make_user(db_session, email="admin2@league-c.test", role="admin", league_id=league.id)
+    make_user(db_session, email="admin@league-d.test", role="admin", league_id=other_league.id)
+    make_user(db_session, email="player@league-c.test", role="user", league_id=league.id)
+
+    resp = client.get(
+        f"/api/v1/admin/leagues/{league.id}/admins", headers=auth_headers(super_admin),
+    )
+    assert resp.status_code == 200
+    emails = {row["email"] for row in resp.json()}
+    assert emails == {"admin1@league-c.test", "admin2@league-c.test"}
+
+
+def test_list_admins_for_nonexistent_league_is_404(client, db_session) -> None:
+    super_admin = _make_super_admin(db_session)
+
+    resp = client.get(
+        "/api/v1/admin/leagues/999999/admins", headers=auth_headers(super_admin),
+    )
+    assert resp.status_code == 404
+
+
 def test_league_admin_cannot_access_admin_leagues_router(client, db_session) -> None:
     league_a = make_league(db_session, name="League A", slug="league-a")
     admin_a = make_user(

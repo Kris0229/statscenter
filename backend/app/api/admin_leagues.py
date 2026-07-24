@@ -68,6 +68,21 @@ def update_league(
     return league
 
 
+@router.get("/{league_id}/admins", response_model=list[LeagueAdminOut])
+def list_league_admins(
+    league_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(_require_super_admin),
+) -> list[User]:
+    _get_league_or_404(db, league_id)
+    return (
+        db.query(User)
+        .filter(User.league_id == league_id, User.role == "admin")
+        .order_by(User.id)
+        .all()
+    )
+
+
 @router.post("/{league_id}/admins", response_model=LeagueAdminOut, status_code=201)
 def bootstrap_league_admin(
     league_id: int,
