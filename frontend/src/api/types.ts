@@ -2,6 +2,7 @@ export interface Team {
   id: number;
   name: string;
   logo_url: string | null;
+  captain_user_id: number | null;
   status: string;
 }
 
@@ -89,13 +90,51 @@ export interface Season {
 export interface Player {
   id: number;
   team_id: number;
+  user_id: number | null;
   name: string;
   number: number;
   positions: string | null;
   bats: string | null;
   throws: string | null;
   photo_url: string | null;
+  title: "manager" | "coach" | "captain" | "member";
+  birthdate: string | null;
+  email: string | null;
+  phone: string | null;
   status: string;
+}
+
+export interface PlayerDetail extends Player {
+  national_id: string | null;
+}
+
+export interface League {
+  id: number;
+  name: string;
+  slug: string;
+  logo_url: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface LeagueAdmin {
+  id: number;
+  email: string;
+  display_name: string;
+  role: string;
+  league_id: number;
+}
+
+export interface ImportRowError {
+  row: number;
+  field: string;
+  msg: string;
+}
+
+export interface ImportResult {
+  valid_rows: number;
+  errors: ImportRowError[];
+  committed: boolean;
 }
 
 export interface BattingLine {
@@ -170,6 +209,7 @@ export interface GameLineScore {
 export interface GameCreateInput {
   season_id: number;
   game_date: string;
+  start_time?: string;
   venue?: string;
   code?: string;
   home_team_id: number;

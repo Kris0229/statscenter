@@ -6,14 +6,22 @@ Committing parsed rows to the database is the API layer's job
 import io
 import re
 from dataclasses import dataclass
+from datetime import date, datetime
 
 import openpyxl
 
-TEMPLATE_COLUMNS = ["number", "name", "positions", "bats_throws", "email", "phone", "birthdate"]
+TEMPLATE_COLUMNS = [
+    "number", "name", "positions", "bats_throws",
+    "title", "birthdate", "national_id", "email", "phone",
+]
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _BATS_VALUES = {"R", "L", "S"}
 _THROWS_VALUES = {"R", "L"}
+# Taiwan national ID: 1 letter + 9 digits.
+_NATIONAL_ID_RE = re.compile(r"^[A-Za-z]\d{9}$")
+_TITLE_LABELS = {"領隊": "manager", "教練": "coach", "隊長": "captain", "隊員": "member"}
+_TITLE_VALUES = set(_TITLE_LABELS.values())
 
 
 @dataclass
@@ -24,6 +32,11 @@ class RosterRow:
     positions: str | None
     bats: str | None
     throws: str | None
+    title: str
+    birthdate: date | None
+    national_id: str | None
+    email: str | None
+    phone: str | None
 
 
 @dataclass
@@ -49,6 +62,19 @@ def build_template_workbook() -> openpyxl.Workbook:
 
 def _blank(value: object) -> bool:
     return value is None or str(value).strip() == ""
+
+
+def _parse_birthdate(raw: object) -> tuple[date | None, str | None]:
+    """Returns (value, error_msg). Accepts Excel date cells (already a date/
+    datetime object) or an ISO 'YYYY-MM-DD' string."""
+    if isinstance(raw, datetime):
+        return raw.date(), None
+    if isinstance(raw, date):
+        return raw, None
+    try:
+        return date.fromisoformat(str(raw).strip()), None
+    except ValueError:
+        return None, "expected a date cell or 'YYYY-MM-DD'"
 
 
 def parse_roster_workbook(content: bytes) -> ParseResult:
@@ -131,14 +157,53 @@ def parse_roster_workbook(content: bytes) -> ParseResult:
                     )
                     row_ok = False
 
-        raw_email = get(values, "email")
-        if not _blank(raw_email) and not _EMAIL_RE.match(str(raw_email).strip()):
-            errors.append(RowError(row=row_idx, field="email", msg="invalid email format"))
-            row_ok = False
+        raw_title = get(values, "title")
+        title = "member"
+        if not _blank(raw_title):
+            raw_title_str = str(raw_title).strip()
+            if raw_title_str in _TITLE_LABELS:
+                title = _TITLE_LABELS[raw_title_str]
+            elif raw_title_str in _TITLE_VALUES:
+                title = raw_title_str
+            else:
+                errors.append(
+                    RowError(
+                        row=row_idx, field="title",
+                        msg=f"must be one of {sorted(_TITLE_LABELS)}",
+                    ),
+                )
+                row_ok = False
 
-        # phone / birthdate: TODO(confirm) — the `players` table (BUILD_SPEC §3)
-        # has no columns for these. Accepted here for validation per §5 but not
-        # persisted; extend the schema if the league needs them stored.
+        birthdate: date | None = None
+        raw_birthdate = get(values, "birthdate")
+        if not _blank(raw_birthdate):
+            birthdate, err = _parse_birthdate(raw_birthdate)
+            if err:
+                errors.append(RowError(row=row_idx, field="birthdate", msg=err))
+                row_ok = False
+
+        national_id: str | None = None
+        raw_national_id = get(values, "national_id")
+        if not _blank(raw_national_id):
+            national_id = str(raw_national_id).strip().upper()
+            if not _NATIONAL_ID_RE.match(national_id):
+                errors.append(
+                    RowError(row=row_idx, field="national_id", msg="expected 1 letter + 9 digits"),
+                )
+                row_ok = False
+
+        email: str | None = None
+        raw_email = get(values, "email")
+        if not _blank(raw_email):
+            email = str(raw_email).strip()
+            if not _EMAIL_RE.match(email):
+                errors.append(RowError(row=row_idx, field="email", msg="invalid email format"))
+                row_ok = False
+
+        phone: str | None = None
+        raw_phone = get(values, "phone")
+        if not _blank(raw_phone):
+            phone = str(raw_phone).strip()
 
         if number is not None:
             if number in seen_numbers:
@@ -154,7 +219,11 @@ def parse_roster_workbook(content: bytes) -> ParseResult:
 
         if row_ok:
             valid_rows.append(
-                RosterRow(row=row_idx, number=number, name=name, positions=positions, bats=bats, throws=throws),  # type: ignore[arg-type]
+                RosterRow(
+                    row=row_idx, number=number, name=name, positions=positions,  # type: ignore[arg-type]
+                    bats=bats, throws=throws, title=title, birthdate=birthdate,
+                    national_id=national_id, email=email, phone=phone,
+                ),
             )
 
     return ParseResult(valid_rows=valid_rows, errors=errors)

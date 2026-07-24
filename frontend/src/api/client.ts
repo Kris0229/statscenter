@@ -4,9 +4,13 @@ import type {
   Game,
   GameCreateInput,
   GameLineScore,
+  ImportResult,
+  League,
+  LeagueAdmin,
   Media,
   PitchingLine,
   Player,
+  PlayerDetail,
   Report,
   ReportHighlights,
   Season,
@@ -80,6 +84,29 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     return undefined as T;
   }
   return res.json() as Promise<T>;
+}
+
+/** Downloads a binary response (e.g. a generated .xlsx template) that needs
+ * the Authorization header — a plain <a href> can't carry it, so fetch as a
+ * blob and trigger the save client-side. */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const res = await fetch(`${API_BASE_URL}${path}`, { headers });
+  if (!res.ok) {
+    throw new ApiError(res.status, `download failed: ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export interface HealthResponse {
@@ -271,4 +298,155 @@ export function updateReport(reportId: number, input: ReportUpdateInput): Promis
 
 export function publishReport(reportId: number): Promise<Report> {
   return apiFetch<Report>(`/reports/${reportId}/publish`, { method: "POST" });
+}
+
+// --- Leagues (super_admin) ---
+
+export function fetchLeagues(): Promise<League[]> {
+  return apiFetch<League[]>("/admin/leagues");
+}
+
+export interface LeagueCreateInput {
+  name: string;
+  slug: string;
+  logo_url?: string;
+}
+
+export function createLeague(input: LeagueCreateInput): Promise<League> {
+  return apiFetch<League>("/admin/leagues", { method: "POST", body: JSON.stringify(input) });
+}
+
+export interface LeagueAdminCreateInput {
+  email: string;
+  display_name: string;
+  password: string;
+}
+
+export function bootstrapLeagueAdmin(
+  leagueId: number,
+  input: LeagueAdminCreateInput,
+): Promise<LeagueAdmin> {
+  return apiFetch<LeagueAdmin>(`/admin/leagues/${leagueId}/admins`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// --- Teams & roster ---
+
+export interface TeamCreateInput {
+  name: string;
+  logo_url?: string;
+}
+
+export function createTeam(input: TeamCreateInput): Promise<Team> {
+  return apiFetch<Team>("/teams", { method: "POST", body: JSON.stringify(input) });
+}
+
+export interface PlayerCreateInput {
+  name: string;
+  number: number;
+  positions?: string;
+  bats?: string;
+  throws?: string;
+  title?: string;
+  birthdate?: string;
+  national_id?: string;
+  email?: string;
+  phone?: string;
+}
+
+export function addPlayer(teamId: number, input: PlayerCreateInput): Promise<Player> {
+  return apiFetch<Player>(`/teams/${teamId}/players`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchPlayerDetail(playerId: number): Promise<PlayerDetail> {
+  return apiFetch<PlayerDetail>(`/players/${playerId}`);
+}
+
+export function downloadRosterTemplate(teamId: number): Promise<void> {
+  return downloadFile(`/teams/${teamId}/roster/template.xlsx`, "roster_template.xlsx");
+}
+
+export function importRoster(
+  teamId: number,
+  file: File,
+  options: { mode?: "append" | "replace"; confirm?: boolean } = {},
+): Promise<ImportResult> {
+  const form = new FormData();
+  form.set("file", file);
+  const params = new URLSearchParams();
+  if (options.mode) params.set("mode", options.mode);
+  if (options.confirm) params.set("confirm", "true");
+  const qs = params.toString();
+  return apiFetch<ImportResult>(`/teams/${teamId}/roster/import${qs ? `?${qs}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+// --- Accounts (power/user) ---
+
+export interface TeamCaptainCreateInput {
+  email: string;
+  password: string;
+  display_name: string;
+}
+
+export function createTeamCaptainAccount(
+  teamId: number,
+  input: TeamCaptainCreateInput,
+): Promise<{ id: number; email: string; display_name: string; role: string }> {
+  return apiFetch(`/teams/${teamId}/captain-account`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export interface PlayerAccountCreateInput {
+  email: string;
+  password: string;
+}
+
+export function createPlayerAccount(
+  playerId: number,
+  input: PlayerAccountCreateInput,
+): Promise<{ id: number; email: string; display_name: string; role: string }> {
+  return apiFetch(`/players/${playerId}/account`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// --- Seasons & schedule ---
+
+export interface SeasonCreateInput {
+  year: number;
+  name: string;
+  is_current?: boolean;
+}
+
+export function createSeason(input: SeasonCreateInput): Promise<Season> {
+  return apiFetch<Season>("/seasons", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function downloadScheduleTemplate(seasonId: number): Promise<void> {
+  return downloadFile(`/seasons/${seasonId}/games/template.xlsx`, "schedule_template.xlsx");
+}
+
+export function importSchedule(
+  seasonId: number,
+  file: File,
+  confirm = false,
+): Promise<ImportResult> {
+  const form = new FormData();
+  form.set("file", file);
+  const qs = confirm ? "?confirm=true" : "";
+  return apiFetch<ImportResult>(`/seasons/${seasonId}/games/import${qs}`, {
+    method: "POST",
+    body: form,
+  });
 }

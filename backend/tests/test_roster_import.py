@@ -127,3 +127,59 @@ def test_power_cannot_import_roster(client, db_session) -> None:
 
     resp = _upload(client, team.id, content, auth_headers(power))
     assert resp.status_code == 403
+
+
+def _build_full_workbook(rows: list[tuple]) -> bytes:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "roster"
+    ws.append(
+        ["number", "name", "positions", "bats_throws", "title", "birthdate", "national_id", "email", "phone"],
+    )
+    for row in rows:
+        ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_import_full_fields_round_trip_and_national_id_hidden_from_list(client, db_session) -> None:
+    _, admin, team = _setup_admin_team(db_session, "F")
+    rows = [
+        (1, "Full Fields", "OF", "R/R", "領隊", "2000-01-15", "A123456789", "full@example.com", "0912345678"),
+        (2, "Default Title", "1B", None, "", "", "", "", ""),
+    ]
+
+    resp = _upload(client, team.id, _build_full_workbook(rows), auth_headers(admin))
+    assert resp.status_code == 200
+    assert resp.json()["committed"] is True
+
+    players = {p.number: p for p in db_session.query(Player).filter(Player.team_id == team.id)}
+    assert players[1].title == "manager"
+    assert str(players[1].birthdate) == "2000-01-15"
+    assert players[1].national_id == "A123456789"
+    assert players[1].email == "full@example.com"
+    assert players[1].phone == "0912345678"
+    assert players[2].title == "member"  # blank title defaults to member
+
+    list_resp = client.get(f"/api/v1/teams/{team.id}/players", headers=auth_headers(admin))
+    assert list_resp.status_code == 200
+    for row in list_resp.json():
+        assert "national_id" not in row
+
+    detail_resp = client.get(f"/api/v1/players/{players[1].id}", headers=auth_headers(admin))
+    assert detail_resp.status_code == 200
+    assert detail_resp.json()["national_id"] == "A123456789"
+
+
+def test_import_invalid_title_and_national_id_rejected(client, db_session) -> None:
+    _, admin, team = _setup_admin_team(db_session, "G")
+    rows = [(1, "Bad Row", None, None, "隊醫", "", "12345", "", "")]
+
+    resp = _upload(client, team.id, _build_full_workbook(rows), auth_headers(admin))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["committed"] is False
+    fields = {e["field"] for e in body["errors"]}
+    assert "title" in fields
+    assert "national_id" in fields

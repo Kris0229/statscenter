@@ -14,6 +14,9 @@ user_role_enum = ENUM(
 player_status_enum = ENUM(
     "active", "left", name="player_status", create_type=False,
 )
+player_title_enum = ENUM(
+    "manager", "coach", "captain", "member", name="player_title", create_type=False,
+)
 roster_req_type_enum = ENUM(
     "rename", "renumber", "add", "remove", name="roster_req_type", create_type=False,
 )

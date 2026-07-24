@@ -89,7 +89,8 @@ def import_roster(
         db.add(
             Player(
                 league_id=league_id, team_id=team.id, name=r.name, number=r.number,
-                positions=r.positions, bats=r.bats, throws=r.throws,
+                positions=r.positions, bats=r.bats, throws=r.throws, title=r.title,
+                birthdate=r.birthdate, national_id=r.national_id, email=r.email, phone=r.phone,
             ),
         )
     db.commit()

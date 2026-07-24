@@ -5,6 +5,7 @@ class TeamOut(BaseModel):
     id: int
     name: str
     logo_url: str | None
+    captain_user_id: int | None
     status: str
 
     model_config = {"from_attributes": True}
@@ -21,3 +22,9 @@ class TeamUpdate(BaseModel):
     logo_url: str | None = None
     captain_user_id: int | None = None
     status: str | None = None  # 'active' | 'inactive'
+
+
+class TeamCaptainCreate(BaseModel):
+    email: str
+    password: str
+    display_name: str

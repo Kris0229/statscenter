@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -22,6 +23,7 @@ from app.db.base import Base
 from app.models.enums import (
     entity_status_enum,
     player_status_enum,
+    player_title_enum,
     roster_req_status_enum,
     roster_req_type_enum,
 )
@@ -110,6 +112,15 @@ class Player(Base):
     bats: Mapped[str | None] = mapped_column(Text)      # CHAR(1) in DDL, but stored as text w/ CHECK
     throws: Mapped[str | None] = mapped_column(Text)
     photo_url: Mapped[str | None] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(
+        player_title_enum, nullable=False, server_default="member",
+    )
+    birthdate: Mapped[date | None] = mapped_column(Date)
+    # Sensitive PII (Taiwan national ID) — deliberately excluded from PlayerOut;
+    # only PlayerDetailOut (admin-only, on-demand) exposes it.
+    national_id: Mapped[str | None] = mapped_column(Text)
+    email: Mapped[str | None] = mapped_column(Text)
+    phone: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         player_status_enum, nullable=False, server_default="active",
     )
