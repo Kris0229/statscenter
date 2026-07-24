@@ -1,18 +1,33 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { Link2, Play } from "lucide-react";
 
 import {
   ApiError,
   deleteMedia,
   fetchGameMedia,
-  fetchMe,
   resolveMediaUrl,
   updateMediaStatus,
   uploadMediaLink,
   uploadPhoto,
-} from "../api/client";
-import type { Media } from "../api/types";
+} from "@/api/client";
+import type { Media } from "@/api/types";
+import { useMe } from "@/hooks/useMe";
+import { FormError } from "@/components/FormStatus";
+import { EmptyState } from "@/components/EmptyState";
+import { LoadingBlock } from "@/components/Loading";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 export function MediaWall({ gameId }: { gameId: number }) {
   const queryClient = useQueryClient();
@@ -20,7 +35,7 @@ export function MediaWall({ gameId }: { gameId: number }) {
     queryKey: ["media", "game", gameId],
     queryFn: () => fetchGameMedia(gameId),
   });
-  const meQuery = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  const meQuery = useMe();
 
   const [linkType, setLinkType] = useState<"video" | "link">("video");
   const [linkUrl, setLinkUrl] = useState("");
@@ -77,76 +92,95 @@ export function MediaWall({ gameId }: { gameId: number }) {
   const myUserId = meQuery.data?.id;
 
   return (
-    <div className="no-print" style={{ marginTop: "2rem" }}>
-      <h2>媒體牆</h2>
-      {mediaQuery.isLoading && <p>載入中…</p>}
-      {mediaQuery.data && mediaQuery.data.length === 0 && <p>尚無媒體。</p>}
+    <div className="no-print mt-8">
+      <h2 className="mb-3 text-lg font-semibold text-foreground">媒體牆</h2>
+      {mediaQuery.isLoading && <LoadingBlock />}
+      {mediaQuery.data && mediaQuery.data.length === 0 && <EmptyState message="尚無媒體。" />}
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-        {mediaQuery.data?.map((m) => (
-          <div
-            key={m.id}
-            style={{
-              border: "1px solid #ddd", padding: "0.5rem", width: 180,
-              opacity: m.status === "inactive" ? 0.4 : 1,
-            }}
-          >
-            {m.type === "photo" ? (
-              <img
-                src={resolveMediaUrl(m.url)}
-                alt=""
-                style={{ maxWidth: "100%", display: "block" }}
-              />
-            ) : (
-              <a href={m.url} target="_blank" rel="noreferrer">
-                {m.type === "video" ? "▶ 影片連結" : "🔗 連結"}
-              </a>
-            )}
-            {m.status === "inactive" && <div style={{ fontSize: "0.75rem" }}>(已隱藏)</div>}
-            <div style={{ fontSize: "0.75rem", marginTop: "0.25rem", display: "flex", gap: "0.5rem" }}>
-              {isAdmin && (
-                <button type="button" onClick={() => handleToggleHide(m)}>
-                  {m.status === "active" ? "隱藏" : "顯示"}
-                </button>
-              )}
-              {(isAdmin || m.uploader_id === myUserId) && (
-                <button type="button" onClick={() => handleDelete(m)}>
-                  刪除
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      {mediaQuery.data && mediaQuery.data.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {mediaQuery.data.map((m) => (
+            <Card
+              key={m.id}
+              className={cn("gap-2 overflow-hidden py-3", m.status === "inactive" && "opacity-40")}
+            >
+              <CardContent className="px-3">
+                {m.type === "photo" ? (
+                  <img src={resolveMediaUrl(m.url)} alt="" className="block w-full rounded-md object-cover" />
+                ) : (
+                  <a
+                    href={m.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                  >
+                    {m.type === "video" ? <Play className="size-4" /> : <Link2 className="size-4" />}
+                    {m.type === "video" ? "影片連結" : "連結"}
+                  </a>
+                )}
+                {m.status === "inactive" && (
+                  <div className="mt-1 text-xs text-muted-foreground">(已隱藏)</div>
+                )}
+                <div className="mt-2 flex gap-3">
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleHide(m)}
+                      className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      {m.status === "active" ? "隱藏" : "顯示"}
+                    </button>
+                  )}
+                  {(isAdmin || m.uploader_id === myUserId) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(m)}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      刪除
+                    </button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      <div style={{ marginTop: "1rem" }}>
-        <label>
-          上傳照片:{" "}
-          <input
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm text-foreground">
+          上傳照片
+          <Input
             type="file"
             accept="image/jpeg,image/png,image/gif,image/webp"
             onChange={handleFileChange}
             disabled={busy}
+            className="w-auto"
           />
         </label>
       </div>
-      <form onSubmit={handleLinkSubmit} style={{ marginTop: "0.5rem", display: "flex", gap: "0.5rem" }}>
-        <select value={linkType} onChange={(e) => setLinkType(e.target.value as "video" | "link")}>
-          <option value="video">影片連結(YouTube)</option>
-          <option value="link">其他連結</option>
-        </select>
-        <input
+      <form onSubmit={handleLinkSubmit} className="mt-2 flex flex-wrap items-center gap-2">
+        <Select value={linkType} onValueChange={(v) => setLinkType(v as "video" | "link")}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="video">影片連結（YouTube）</SelectItem>
+            <SelectItem value="link">其他連結</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
           type="url"
           placeholder="https://..."
           value={linkUrl}
           onChange={(e) => setLinkUrl(e.target.value)}
-          style={{ flex: 1 }}
+          className="max-w-sm flex-1"
         />
-        <button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy}>
           新增
-        </button>
+        </Button>
       </form>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      <FormError message={error} />
     </div>
   );
 }

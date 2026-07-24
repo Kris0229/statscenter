@@ -1,16 +1,26 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 import {
   ApiError,
   fetchGameMedia,
-  fetchMe,
   fetchReport,
   publishReport,
   resolveMediaUrl,
   updateReport,
-} from "../api/client";
+} from "@/api/client";
+import { useMe } from "@/hooks/useMe";
+import { FormField } from "@/components/FormField";
+import { FormError } from "@/components/FormStatus";
+import { LoadingBlock } from "@/components/Loading";
+import { ReportStatusBadge } from "@/components/StatusBadge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export function ReportPage() {
   const params = useParams<{ reportId: string }>();
@@ -22,7 +32,7 @@ export function ReportPage() {
     queryFn: () => fetchReport(reportId),
     enabled: Number.isFinite(reportId),
   });
-  const meQuery = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  const meQuery = useMe();
 
   const gameId = reportQuery.data?.game_id;
   const mediaQuery = useQuery({
@@ -36,6 +46,7 @@ export function ReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
 
   useEffect(() => {
     if (reportQuery.data) {
@@ -65,6 +76,7 @@ export function ReportPage() {
     try {
       await publishReport(reportQuery.data.id);
       queryClient.invalidateQueries({ queryKey: ["report", reportId] });
+      setConfirmPublishOpen(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "發布失敗");
     } finally {
@@ -72,9 +84,9 @@ export function ReportPage() {
     }
   }
 
-  if (reportQuery.isLoading) return <p>載入中…</p>;
+  if (reportQuery.isLoading) return <LoadingBlock />;
   if (reportQuery.isError || !reportQuery.data) {
-    return <p style={{ color: "crimson" }}>無法載入報導(可能尚未發布)</p>;
+    return <FormError message="無法載入報導（可能尚未發布）" />;
   }
 
   const report = reportQuery.data;
@@ -82,48 +94,72 @@ export function ReportPage() {
   const cover = mediaQuery.data?.find((m) => m.id === report.cover_media_id);
 
   return (
-    <div style={{ maxWidth: 720 }}>
-      <p>
-        <Link to={`/games/${report.game_id}/boxscore`}>← 回比賽紀錄表</Link>
-      </p>
+    <div className="max-w-2xl">
+      <Link
+        to={`/games/${report.game_id}/boxscore`}
+        className="mb-4 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+      >
+        <ArrowLeft className="size-4" />
+        回比賽紀錄表
+      </Link>
 
       {cover && cover.type === "photo" && (
-        <img
-          src={resolveMediaUrl(cover.url)}
-          alt=""
-          style={{ maxWidth: "100%", marginBottom: "1rem" }}
-        />
+        <img src={resolveMediaUrl(cover.url)} alt="" className="mb-4 w-full rounded-lg object-cover" />
       )}
 
       {isAdmin ? (
-        <>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={{ display: "block", width: "100%", fontSize: "1.5rem", marginBottom: "0.5rem" }}
-          />
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={12}
-            style={{ display: "block", width: "100%", marginBottom: "0.5rem" }}
-          />
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button type="button" onClick={handleSave} disabled={saving}>
-              {saving ? "儲存中…" : "儲存"}
-            </button>
-            <button type="button" onClick={handlePublish} disabled={publishing || !!report.published_at}>
-              {report.published_at ? "已發布" : publishing ? "發布中…" : "發布"}
-            </button>
-          </div>
-          {error && <p style={{ color: "crimson" }}>{error}</p>}
-        </>
+        <Card>
+          <CardContent className="grid gap-4">
+            <div className="flex items-center gap-2">
+              <ReportStatusBadge publishedAt={report.published_at} />
+            </div>
+            <FormField label="標題" htmlFor="report-title">
+              <Input
+                id="report-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="text-lg font-semibold"
+              />
+            </FormField>
+            <FormField label="內容" htmlFor="report-content">
+              <Textarea
+                id="report-content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={12}
+              />
+            </FormField>
+            <FormError message={error} />
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={handleSave} disabled={saving}>
+                {saving ? "儲存中…" : "儲存"}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setConfirmPublishOpen(true)}
+                disabled={publishing || !!report.published_at}
+              >
+                {report.published_at ? "已發布" : publishing ? "發布中…" : "發布"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <>
-          <h1>{report.title}</h1>
-          <div style={{ whiteSpace: "pre-wrap" }}>{report.content}</div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{report.title}</h1>
+          <div className="mt-4 whitespace-pre-wrap text-foreground">{report.content}</div>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmPublishOpen}
+        onOpenChange={setConfirmPublishOpen}
+        title="確認發布這篇報導？"
+        description="發布後將公開顯示，此動作無法復原。"
+        confirmLabel="確認發布"
+        onConfirm={handlePublish}
+        busy={publishing}
+      />
     </div>
   );
 }

@@ -2,12 +2,29 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { ApiError, bootstrapLeagueAdmin, createLeague, fetchLeagues } from "@/api/client";
+import { PageHeader } from "@/components/PageHeader";
+import { FormField } from "@/components/FormField";
+import { FormError, FormSuccess } from "@/components/FormStatus";
+import { LoadingBlock } from "@/components/Loading";
+import { EntityStatusBadge } from "@/components/StatusBadge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
-  ApiError,
-  bootstrapLeagueAdmin,
-  createLeague,
-  fetchLeagues,
-} from "../../api/client";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export function LeaguesPage() {
   const queryClient = useQueryClient();
@@ -67,41 +84,57 @@ export function LeaguesPage() {
     }
   }
 
-  if (leaguesQuery.isLoading) return <p>載入中…</p>;
+  if (leaguesQuery.isLoading) return <LoadingBlock />;
+
+  const adminFormLeague = leaguesQuery.data?.find((l) => l.id === adminFormLeagueId);
 
   return (
-    <div style={{ maxWidth: 720 }}>
-      <h1>聯盟管理</h1>
+    <div className="max-w-3xl">
+      <PageHeader title="聯盟管理" />
 
-      <h2 style={{ fontSize: "1.1rem" }}>新增聯盟</h2>
-      <form onSubmit={handleCreateLeague} style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
-        <input placeholder="聯盟名稱" value={name} onChange={(e) => setName(e.target.value)} required />
-        <input placeholder="slug (英數/連字號)" value={slug} onChange={(e) => setSlug(e.target.value)} required />
-        <button type="submit" disabled={submitting}>
-          {submitting ? "建立中…" : "建立"}
-        </button>
-      </form>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>新增聯盟</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreateLeague} className="flex flex-wrap items-end gap-3">
+            <FormField label="聯盟名稱" htmlFor="league-name" required className="grid gap-1.5">
+              <Input id="league-name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </FormField>
+            <FormField label="Slug（英數/連字號）" htmlFor="league-slug" required className="grid gap-1.5">
+              <Input id="league-slug" value={slug} onChange={(e) => setSlug(e.target.value)} required />
+            </FormField>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "建立中…" : "建立"}
+            </Button>
+          </form>
+          <FormError message={error} />
+        </CardContent>
+      </Card>
 
-      <h2 style={{ fontSize: "1.1rem" }}>聯盟列表</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th style={thStyle}>名稱</th>
-            <th style={thStyle}>Slug</th>
-            <th style={thStyle}>狀態</th>
-            <th style={thStyle}></th>
-          </tr>
-        </thead>
-        <tbody>
+      <h2 className="mb-2 text-lg font-semibold text-foreground">聯盟列表</h2>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>名稱</TableHead>
+            <TableHead>Slug</TableHead>
+            <TableHead>狀態</TableHead>
+            <TableHead></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {leaguesQuery.data?.map((league) => (
-            <tr key={league.id}>
-              <td style={tdStyle}>{league.name}</td>
-              <td style={tdStyle}>{league.slug}</td>
-              <td style={tdStyle}>{league.status}</td>
-              <td style={tdStyle}>
-                <button
+            <TableRow key={league.id}>
+              <TableCell>{league.name}</TableCell>
+              <TableCell>{league.slug}</TableCell>
+              <TableCell>
+                <EntityStatusBadge status={league.status} />
+              </TableCell>
+              <TableCell>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     setAdminFormLeagueId(league.id);
                     setAdminError(null);
@@ -109,62 +142,53 @@ export function LeaguesPage() {
                   }}
                 >
                   指派管理員
-                </button>
-              </td>
-            </tr>
+                </Button>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
 
-      {adminFormLeagueId !== null && (
-        <div style={{ marginTop: "1.5rem", border: "1px solid #ddd", padding: "1rem" }}>
-          <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>
-            指派管理員 —{" "}
-            {leaguesQuery.data?.find((l) => l.id === adminFormLeagueId)?.name}
-          </h2>
-          <form onSubmit={handleCreateAdmin}>
-            <label style={fieldStyle}>
-              Email
-              <input
+      <Dialog
+        open={adminFormLeagueId !== null}
+        onOpenChange={(open) => {
+          if (!open) setAdminFormLeagueId(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>指派管理員 — {adminFormLeague?.name}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateAdmin} className="grid gap-4">
+            <FormField label="Email" htmlFor="admin-email" required>
+              <Input
+                id="admin-email"
                 type="email"
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
                 required
-                style={inputStyle}
               />
-            </label>
-            <label style={fieldStyle}>
-              姓名
-              <input
-                value={adminName}
-                onChange={(e) => setAdminName(e.target.value)}
-                required
-                style={inputStyle}
-              />
-            </label>
-            <label style={fieldStyle}>
-              初始密碼
-              <input
+            </FormField>
+            <FormField label="姓名" htmlFor="admin-name" required>
+              <Input id="admin-name" value={adminName} onChange={(e) => setAdminName(e.target.value)} required />
+            </FormField>
+            <FormField label="初始密碼" htmlFor="admin-password" required>
+              <Input
+                id="admin-password"
                 type="password"
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
                 required
-                style={inputStyle}
               />
-            </label>
-            {adminError && <p style={{ color: "crimson" }}>{adminError}</p>}
-            {adminSuccess && <p style={{ color: "green" }}>{adminSuccess}</p>}
-            <button type="submit" disabled={adminSubmitting}>
+            </FormField>
+            <FormError message={adminError} />
+            <FormSuccess message={adminSuccess} />
+            <Button type="submit" disabled={adminSubmitting}>
               {adminSubmitting ? "建立中…" : "建立管理員帳號"}
-            </button>
+            </Button>
           </form>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-const thStyle = { textAlign: "left" as const, borderBottom: "1px solid #ddd", padding: "0.4rem" };
-const tdStyle = { borderBottom: "1px solid #eee", padding: "0.4rem" };
-const fieldStyle = { display: "block", marginBottom: "0.75rem" };
-const inputStyle = { display: "block", width: "100%", padding: "0.4rem", marginTop: "0.25rem" };

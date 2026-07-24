@@ -3,7 +3,21 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { ApiError, createGame, fetchSeasons, fetchTeams } from "../api/client";
+import { ApiError, createGame, fetchSeasons, fetchTeams } from "@/api/client";
+import { PageHeader } from "@/components/PageHeader";
+import { FormField } from "@/components/FormField";
+import { FormError } from "@/components/FormStatus";
+import { LoadingBlock } from "@/components/Loading";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function NewGamePage() {
   const navigate = useNavigate();
@@ -46,75 +60,73 @@ export function NewGamePage() {
     }
   }
 
-  if (seasonsQuery.isLoading || teamsQuery.isLoading) return <p>載入中…</p>;
+  if (seasonsQuery.isLoading || teamsQuery.isLoading) return <LoadingBlock />;
 
   return (
-    <div style={{ maxWidth: 420 }}>
-      <h1>新增比賽</h1>
-      {currentSeason && (
-        <p>
-          球季:{currentSeason.name}({currentSeason.year})
-        </p>
-      )}
-      <form onSubmit={handleSubmit}>
-        <label style={fieldStyle}>
-          日期
-          <input
-            type="date"
-            value={gameDate}
-            onChange={(e) => setGameDate(e.target.value)}
-            required
-            style={inputStyle}
-          />
-        </label>
-        <label style={fieldStyle}>
-          客隊
-          <select
-            value={awayTeamId}
-            onChange={(e) => setAwayTeamId(e.target.value ? Number(e.target.value) : "")}
-            required
-            style={inputStyle}
-          >
-            <option value="">請選擇</option>
-            {teamsQuery.data?.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={fieldStyle}>
-          主隊
-          <select
-            value={homeTeamId}
-            onChange={(e) => setHomeTeamId(e.target.value ? Number(e.target.value) : "")}
-            required
-            style={inputStyle}
-          >
-            <option value="">請選擇</option>
-            {teamsQuery.data?.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={fieldStyle}>
-          場地
-          <input value={venue} onChange={(e) => setVenue(e.target.value)} style={inputStyle} />
-        </label>
-        <label style={fieldStyle}>
-          賽事代碼
-          <input value={code} onChange={(e) => setCode(e.target.value)} style={inputStyle} />
-        </label>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-        <button type="submit" disabled={submitting || !currentSeason}>
-          {submitting ? "建立中…" : "建立比賽並開始計分"}
-        </button>
-      </form>
+    <div className="max-w-lg">
+      <PageHeader
+        title="新增比賽"
+        description={currentSeason ? `球季：${currentSeason.name}（${currentSeason.year}）` : undefined}
+      />
+      <Card>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="grid gap-4">
+            <FormField label="日期" htmlFor="game-date" required>
+              <Input
+                id="game-date"
+                type="date"
+                value={gameDate}
+                onChange={(e) => setGameDate(e.target.value)}
+                required
+              />
+            </FormField>
+            <FormField label="客隊" htmlFor="away-team" required>
+              <Select
+                value={awayTeamId ? String(awayTeamId) : ""}
+                onValueChange={(v) => setAwayTeamId(v ? Number(v) : "")}
+              >
+                <SelectTrigger id="away-team" className="w-full">
+                  <SelectValue placeholder="請選擇" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamsQuery.data?.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="主隊" htmlFor="home-team" required>
+              <Select
+                value={homeTeamId ? String(homeTeamId) : ""}
+                onValueChange={(v) => setHomeTeamId(v ? Number(v) : "")}
+              >
+                <SelectTrigger id="home-team" className="w-full">
+                  <SelectValue placeholder="請選擇" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamsQuery.data?.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="場地" htmlFor="venue">
+              <Input id="venue" value={venue} onChange={(e) => setVenue(e.target.value)} />
+            </FormField>
+            <FormField label="賽事代碼" htmlFor="code">
+              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} />
+            </FormField>
+            <FormError message={error} />
+            <Button type="submit" disabled={submitting || !currentSeason}>
+              {submitting ? "建立中…" : "建立比賽並開始計分"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
-const fieldStyle = { display: "block", marginBottom: "0.75rem" };
-const inputStyle = { display: "block", width: "100%", padding: "0.4rem", marginTop: "0.25rem" };

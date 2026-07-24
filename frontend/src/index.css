@@ -1,0 +1,88 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+
+  --background: #fcfcfc;
+  --foreground: #1e293b;
+
+  --card: #ffffff;
+  --card-foreground: #1e293b;
+  --popover: #ffffff;
+  --popover-foreground: #1e293b;
+
+  /* 品牌深藍 — 導覽列、次要按鈕 */
+  --primary: #1e3a5f;
+  --primary-foreground: #fafafa;
+
+  --secondary: #f1f3f6;
+  --secondary-foreground: #1e3a5f;
+
+  /* 表格表頭底色、次要文字 */
+  --muted: #f1f3f6;
+  --muted-foreground: #64748b;
+
+  /* 活力橘 — CTA、active nav、強調 */
+  --accent: #f97316;
+  --accent-foreground: #1a1a1a;
+
+  /* 對應現有 crimson 錯誤慣例 */
+  --destructive: #dc2626;
+  --destructive-foreground: #fafafa;
+
+  /* 對應現有 green 成功慣例（shadcn 未內建，自訂） */
+  --success: #16a34a;
+  --success-foreground: #fafafa;
+
+  /* 進行中／待處理狀態（自訂） */
+  --warning: #f59e0b;
+  --warning-foreground: #1a1a1a;
+
+  --border: #dfe3e8;
+  --input: #dfe3e8;
+  --ring: #1e3a5f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: system-ui, sans-serif;
+  }
+}

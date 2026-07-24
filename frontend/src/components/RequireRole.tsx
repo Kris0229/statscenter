@@ -1,13 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
-import { fetchMe } from "../api/client";
+import { useMe } from "@/hooks/useMe";
+import { LoadingBlock } from "@/components/Loading";
 
 export function RequireRole({ roles, children }: { roles: string[]; children: ReactNode }) {
-  const meQuery = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  const meQuery = useMe();
 
-  if (meQuery.isLoading) return <p>載入中…</p>;
+  if (meQuery.isLoading) return <LoadingBlock />;
   if (!meQuery.data || !roles.includes(meQuery.data.role)) {
     return <Navigate to="/games" replace />;
   }

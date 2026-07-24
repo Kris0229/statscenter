@@ -1,51 +1,72 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
-import { fetchGames } from "../api/client";
+import { fetchGames } from "@/api/client";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
+import { LoadingBlock } from "@/components/Loading";
+import { GameStatusBadge } from "@/components/StatusBadge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { FormError } from "@/components/FormStatus";
 
 export function GamesListPage() {
   const { data, isLoading, isError } = useQuery({ queryKey: ["games"], queryFn: fetchGames });
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>賽程</h1>
-        <Link to="/games/new">+ 新增比賽</Link>
-      </div>
-      {isLoading && <p>載入中…</p>}
-      {isError && <p style={{ color: "crimson" }}>無法載入賽程</p>}
-      {data && data.length === 0 && <p>目前沒有比賽。</p>}
+      <PageHeader
+        title="賽程"
+        action={
+          <Button asChild>
+            <Link to="/games/new">+ 新增比賽</Link>
+          </Button>
+        }
+      />
+      {isLoading && <LoadingBlock />}
+      {isError && <FormError message="無法載入賽程" />}
+      {data && data.length === 0 && <EmptyState message="目前沒有比賽。" />}
       {data && data.length > 0 && (
-        <table style={{ borderCollapse: "collapse", width: "100%" }}>
-          <thead>
-            <tr>
-              <th style={thStyle}>日期</th>
-              <th style={thStyle}>賽事代碼</th>
-              <th style={thStyle}>狀態</th>
-              <th style={thStyle}></th>
-              <th style={thStyle}></th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>日期</TableHead>
+              <TableHead>賽事代碼</TableHead>
+              <TableHead>狀態</TableHead>
+              <TableHead></TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {data.map((game) => (
-              <tr key={game.id}>
-                <td style={tdStyle}>{game.game_date}</td>
-                <td style={tdStyle}>{game.code ?? "—"}</td>
-                <td style={tdStyle}>{game.status}</td>
-                <td style={tdStyle}>
-                  <Link to={`/games/${game.id}/score-entry`}>計分</Link>
-                </td>
-                <td style={tdStyle}>
-                  <Link to={`/games/${game.id}/boxscore`}>比賽紀錄表</Link>
-                </td>
-              </tr>
+              <TableRow key={game.id}>
+                <TableCell>{game.game_date}</TableCell>
+                <TableCell>{game.code ?? "—"}</TableCell>
+                <TableCell>
+                  <GameStatusBadge status={game.status} />
+                </TableCell>
+                <TableCell>
+                  <Link to={`/games/${game.id}/score-entry`} className="text-primary hover:underline">
+                    計分
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <Link to={`/games/${game.id}/boxscore`} className="text-primary hover:underline">
+                    比賽紀錄表
+                  </Link>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
     </div>
   );
 }
-
-const thStyle = { textAlign: "left" as const, borderBottom: "2px solid #333", padding: "0.4rem" };
-const tdStyle = { borderBottom: "1px solid #ddd", padding: "0.4rem" };

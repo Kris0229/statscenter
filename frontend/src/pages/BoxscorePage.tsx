@@ -1,9 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { Printer } from "lucide-react";
 
-import { createReport, fetchBoxscore, fetchMe, fetchReportsForGame } from "../api/client";
-import type { Boxscore, BoxscoreBattingNotes, BoxscoreTeamSide } from "../api/types";
-import { MediaWall } from "../components/MediaWall";
+import { createReport, fetchBoxscore, fetchReportsForGame } from "@/api/client";
+import type { Boxscore, BoxscoreBattingNotes, BoxscoreTeamSide } from "@/api/types";
+import { MediaWall } from "@/components/MediaWall";
+import { useMe } from "@/hooks/useMe";
+import { GameStatusBadge, ReportStatusBadge } from "@/components/StatusBadge";
+import { FormError } from "@/components/FormStatus";
+import { LoadingBlock } from "@/components/Loading";
+import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import "./BoxscorePage.css";
 
 export function BoxscorePage() {
@@ -16,8 +24,8 @@ export function BoxscorePage() {
     enabled: Number.isFinite(gameId),
   });
 
-  if (isLoading) return <p>載入中…</p>;
-  if (isError || !data) return <p style={{ color: "crimson" }}>無法載入比賽紀錄表</p>;
+  if (isLoading) return <LoadingBlock />;
+  if (isError || !data) return <FormError message="無法載入比賽紀錄表" />;
 
   return <BoxscoreView boxscore={data} />;
 }
@@ -25,29 +33,39 @@ export function BoxscorePage() {
 function BoxscoreView({ boxscore }: { boxscore: Boxscore }) {
   return (
     <div>
-      <div className="no-print" style={{ marginBottom: "1rem" }}>
-        <button type="button" onClick={() => window.print()}>
+      <div className="no-print mb-4">
+        <Button type="button" variant="outline" onClick={() => window.print()}>
+          <Printer />
           列印
-        </button>
+        </Button>
       </div>
 
-      <h1>
+      <h1 className="text-2xl font-bold tracking-tight text-foreground">
         {boxscore.away.team.name} @ {boxscore.home.team.name}
       </h1>
-      <p>
-        {boxscore.game.date}
-        {boxscore.game.venue && <> · {boxscore.game.venue}</>}
-        {boxscore.game.code && <> · {boxscore.game.code}</>} · {statusLabel(boxscore.game.status)}
+      <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <span>
+          {boxscore.game.date}
+          {boxscore.game.venue && <> · {boxscore.game.venue}</>}
+          {boxscore.game.code && <> · {boxscore.game.code}</>}
+        </span>
+        <GameStatusBadge status={boxscore.game.status} />
       </p>
 
-      <LineScoreTable boxscore={boxscore} />
+      <div className="mt-4">
+        <LineScoreTable boxscore={boxscore} />
+      </div>
 
-      <h2 className="boxscore-team-heading">{boxscore.away.team.name}(客隊)</h2>
+      <h2 className="boxscore-team-heading text-lg font-semibold text-foreground">
+        {boxscore.away.team.name}（客隊）
+      </h2>
       <BattingTable side={boxscore.away} />
       <BattingNotesView notes={boxscore.away.batting_notes} />
       <PitchingTable side={boxscore.away} />
 
-      <h2 className="boxscore-team-heading">{boxscore.home.team.name}(主隊)</h2>
+      <h2 className="boxscore-team-heading text-lg font-semibold text-foreground">
+        {boxscore.home.team.name}（主隊）
+      </h2>
       <BattingTable side={boxscore.home} />
       <BattingNotesView notes={boxscore.home.batting_notes} />
       <PitchingTable side={boxscore.home} />
@@ -64,7 +82,7 @@ function ReportSection({ gameId }: { gameId: number }) {
     queryKey: ["reports", "game", gameId],
     queryFn: () => fetchReportsForGame(gameId),
   });
-  const meQuery = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  const meQuery = useMe();
 
   async function handleCreate() {
     const report = await createReport({ game_id: gameId });
@@ -75,37 +93,37 @@ function ReportSection({ gameId }: { gameId: number }) {
   const isAdmin = meQuery.data?.role === "admin";
 
   return (
-    <div className="no-print" style={{ marginTop: "2rem" }}>
-      <h2>賽後報導</h2>
-      {reports.length === 0 && <p>尚無報導。</p>}
-      <ul>
-        {reports.map((r) => (
-          <li key={r.id}>
-            <Link to={`/reports/${r.id}`}>
-              {r.title}
-              {!r.published_at && "(草稿)"}
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {isAdmin && reports.length === 0 && (
-        <button type="button" onClick={handleCreate}>
-          撰寫賽後報導
-        </button>
-      )}
+    <div className="no-print mt-8">
+      <h2 className="mb-3 text-lg font-semibold text-foreground">賽後報導</h2>
+      <Card>
+        <CardContent>
+          {reports.length === 0 ? (
+            <EmptyState
+              message="尚無報導。"
+              action={
+                isAdmin ? (
+                  <Button type="button" variant="outline" size="sm" onClick={handleCreate}>
+                    撰寫賽後報導
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <ul className="grid gap-2">
+              {reports.map((r) => (
+                <li key={r.id} className="flex items-center gap-2">
+                  <Link to={`/reports/${r.id}`} className="text-primary hover:underline">
+                    {r.title}
+                  </Link>
+                  <ReportStatusBadge publishedAt={r.published_at} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-}
-
-function statusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    scheduled: "未開賽",
-    in_progress: "進行中",
-    final: "已完賽",
-    postponed: "延賽",
-    cancelled: "取消",
-  };
-  return labels[status] ?? status;
 }
 
 function LineScoreTable({ boxscore }: { boxscore: Boxscore }) {

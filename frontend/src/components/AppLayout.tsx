@@ -1,14 +1,43 @@
-import { useQuery } from "@tanstack/react-query";
-import type { CSSProperties } from "react";
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
-import { fetchMe } from "../api/client";
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "@/auth/AuthContext";
+import { useMe } from "@/hooks/useMe";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: "系統管理員",
+  admin: "管理員",
+  power: "進階使用者",
+  user: "一般使用者",
+};
+
+function navLinkClassName({ isActive }: { isActive: boolean }) {
+  return cn(
+    "border-b-2 px-1 py-1 text-sm font-medium transition-colors",
+    isActive
+      ? "border-accent text-white"
+      : "border-transparent text-white/70 hover:text-white",
+  );
+}
+
+function initials(name: string) {
+  return name.trim().slice(0, 2).toUpperCase();
+}
 
 export function AppLayout() {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
-  const meQuery = useQuery({ queryKey: ["me"], queryFn: fetchMe, enabled: isAuthenticated });
+  const meQuery = useMe();
 
   function handleLogout() {
     logout();
@@ -18,59 +47,59 @@ export function AppLayout() {
   const role = meQuery.data?.role;
 
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif" }}>
-      <header className="no-print" style={topBarStyle}>
-        <nav style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
-          <Link to="/games" style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}>
+    <div className="min-h-screen bg-background">
+      <header className="no-print sticky top-0 z-40 flex items-center justify-between gap-4 bg-primary px-6 py-3 text-primary-foreground shadow-sm">
+        <nav className="flex items-center gap-6">
+          <Link to="/games" className="text-lg font-bold tracking-tight text-white">
             棒壘聯盟成績管理系統
           </Link>
           {isAuthenticated && role && role !== "super_admin" && (
-            <>
-              <Link to="/teams" style={navLinkStyle}>
+            <div className="flex items-center gap-5">
+              <NavLink to="/games" className={navLinkClassName}>
+                比賽
+              </NavLink>
+              <NavLink to="/teams" className={navLinkClassName}>
                 球隊
-              </Link>
-              <Link to="/schedule" style={navLinkStyle}>
+              </NavLink>
+              <NavLink to="/schedule" className={navLinkClassName}>
                 賽程管理
-              </Link>
-            </>
+              </NavLink>
+            </div>
           )}
           {isAuthenticated && role === "super_admin" && (
-            <Link to="/admin/leagues" style={navLinkStyle}>
+            <NavLink to="/admin/leagues" className={navLinkClassName}>
               聯盟管理
-            </Link>
+            </NavLink>
           )}
         </nav>
         {isAuthenticated && (
-          <button type="button" onClick={handleLogout} style={logoutButtonStyle}>
-            登出
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="rounded-full outline-none ring-offset-primary focus-visible:ring-2 focus-visible:ring-white/50">
+              <Avatar>
+                <AvatarFallback className="bg-white/15 text-white">
+                  {meQuery.data ? initials(meQuery.data.display_name) : "…"}
+                </AvatarFallback>
+              </Avatar>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel className="flex flex-col">
+                <span className="font-medium">{meQuery.data?.display_name}</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {role ? (ROLE_LABELS[role] ?? role) : ""}
+                </span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+                <LogOut />
+                登出
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </header>
-      <main style={{ padding: "1.5rem" }}>
+      <main className="p-6">
         <Outlet />
       </main>
     </div>
   );
 }
-
-const topBarStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  padding: "0.75rem 1.5rem",
-  borderBottom: "1px solid #ddd",
-};
-
-const navLinkStyle: CSSProperties = {
-  color: "inherit",
-  textDecoration: "none",
-  fontSize: "0.9rem",
-};
-
-const logoutButtonStyle: CSSProperties = {
-  border: "1px solid #ccc",
-  background: "white",
-  borderRadius: 4,
-  padding: "0.35rem 0.75rem",
-  cursor: "pointer",
-};

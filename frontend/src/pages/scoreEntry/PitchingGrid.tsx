@@ -115,7 +115,11 @@ export function PitchingGrid({
                 </td>
               ))}
               <td>
-                <button type="button" onClick={() => onRemovePitcher(row)}>
+                <button
+                  type="button"
+                  onClick={() => onRemovePitcher(row)}
+                  className="text-xs text-destructive hover:underline"
+                >
                   移除
                 </button>
               </td>
@@ -123,7 +127,11 @@ export function PitchingGrid({
           ))}
         </tbody>
       </table>
-      <button type="button" onClick={onAddPitcher}>
+      <button
+        type="button"
+        onClick={onAddPitcher}
+        className="text-sm text-primary hover:underline"
+      >
         + 新增投手
       </button>
     </div>

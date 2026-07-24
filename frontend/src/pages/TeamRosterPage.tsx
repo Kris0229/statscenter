@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useParams } from "react-router-dom";
+import { Eye } from "lucide-react";
 
 import {
   addPlayer,
@@ -9,13 +10,42 @@ import {
   createPlayerAccount,
   createTeamCaptainAccount,
   downloadRosterTemplate,
-  fetchMe,
   fetchPlayerDetail,
   fetchTeam,
   fetchTeamPlayers,
   importRoster,
-} from "../api/client";
-import type { ImportResult } from "../api/types";
+} from "@/api/client";
+import type { ImportResult } from "@/api/types";
+import { useMe } from "@/hooks/useMe";
+import { PageHeader } from "@/components/PageHeader";
+import { FormField } from "@/components/FormField";
+import { FormError, FormSuccess } from "@/components/FormStatus";
+import { LoadingBlock } from "@/components/Loading";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const TITLE_LABELS: Record<string, string> = {
   manager: "領隊",
@@ -29,7 +59,7 @@ export function TeamRosterPage() {
   const teamId = Number(teamIdParam);
   const queryClient = useQueryClient();
 
-  const meQuery = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  const meQuery = useMe();
   const teamQuery = useQuery({ queryKey: ["team", teamId], queryFn: () => fetchTeam(teamId) });
   const playersQuery = useQuery({
     queryKey: ["team", teamId, "players"],
@@ -195,215 +225,316 @@ export function TeamRosterPage() {
     }
   }
 
-  if (teamQuery.isLoading || playersQuery.isLoading) return <p>載入中…</p>;
+  if (teamQuery.isLoading || playersQuery.isLoading) return <LoadingBlock />;
 
   const team = teamQuery.data;
 
   return (
-    <div style={{ maxWidth: 960 }}>
-      <h1>{team?.name}</h1>
+    <div className="max-w-4xl">
+      <PageHeader
+        title={team?.name ?? ""}
+        action={
+          isAdmin ? (
+            team?.captain_user_id ? (
+              <span className="text-sm text-muted-foreground">此球隊已有隊長帳號。</span>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => setShowCaptainForm(true)}>
+                建立隊長帳號
+              </Button>
+            )
+          ) : undefined
+        }
+      />
 
-      {isAdmin && (
-        <div style={{ marginBottom: "1.5rem" }}>
-          {team?.captain_user_id ? (
-            <p style={{ color: "#666" }}>此球隊已有隊長帳號。</p>
-          ) : showCaptainForm ? (
-            <form onSubmit={handleCreateCaptain} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-              <input
-                type="email" placeholder="隊長 Email" value={captainEmail}
-                onChange={(e) => setCaptainEmail(e.target.value)} required
-              />
-              <input
-                placeholder="姓名" value={captainName}
-                onChange={(e) => setCaptainName(e.target.value)} required
-              />
-              <input
-                type="password" placeholder="初始密碼" value={captainPassword}
-                onChange={(e) => setCaptainPassword(e.target.value)} required
-              />
-              <button type="submit" disabled={captainSubmitting}>
-                {captainSubmitting ? "建立中…" : "建立"}
-              </button>
-              <button type="button" onClick={() => setShowCaptainForm(false)}>
-                取消
-              </button>
-            </form>
-          ) : (
-            <button type="button" onClick={() => setShowCaptainForm(true)}>
-              建立隊長帳號
-            </button>
-          )}
-          {captainError && <p style={{ color: "crimson" }}>{captainError}</p>}
-        </div>
-      )}
-
-      <h2 style={{ fontSize: "1.1rem" }}>球員名單</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
-        <thead>
-          <tr>
-            <th style={thStyle}>背號</th>
-            <th style={thStyle}>姓名</th>
-            <th style={thStyle}>職稱</th>
-            <th style={thStyle}>守位</th>
-            <th style={thStyle}>生日</th>
-            <th style={thStyle}>Email</th>
-            <th style={thStyle}>電話</th>
-            <th style={thStyle}>身分證字號</th>
-            {isAdmin && <th style={thStyle}>帳號</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {playersQuery.data?.map((p) => (
-            <tr key={p.id}>
-              <td style={tdStyle}>{p.number}</td>
-              <td style={tdStyle}>{p.name}</td>
-              <td style={tdStyle}>{TITLE_LABELS[p.title] ?? p.title}</td>
-              <td style={tdStyle}>{p.positions ?? ""}</td>
-              <td style={tdStyle}>{p.birthdate ?? ""}</td>
-              <td style={tdStyle}>{p.email ?? ""}</td>
-              <td style={tdStyle}>{p.phone ?? ""}</td>
-              <td style={tdStyle}>
-                {revealed[p.id] !== undefined ? (
-                  revealed[p.id] ?? "(未填)"
-                ) : (
-                  <button type="button" onClick={() => handleReveal(p.id)}>
-                    顯示
-                  </button>
-                )}
-              </td>
-              {isAdmin && (
-                <td style={tdStyle}>
-                  {p.user_id ? (
-                    "已建立"
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAccountFormPlayerId(p.id);
-                        setAccountError(null);
-                      }}
-                    >
-                      建立登入帳號
-                    </button>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>球員名單</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>背號</TableHead>
+                <TableHead>姓名</TableHead>
+                <TableHead>職稱</TableHead>
+                <TableHead>守位</TableHead>
+                <TableHead>生日</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>電話</TableHead>
+                <TableHead>身分證字號</TableHead>
+                {isAdmin && <TableHead>帳號</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {playersQuery.data?.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell>{p.number}</TableCell>
+                  <TableCell>{p.name}</TableCell>
+                  <TableCell>{TITLE_LABELS[p.title] ?? p.title}</TableCell>
+                  <TableCell>{p.positions ?? ""}</TableCell>
+                  <TableCell>{p.birthdate ?? ""}</TableCell>
+                  <TableCell>{p.email ?? ""}</TableCell>
+                  <TableCell>{p.phone ?? ""}</TableCell>
+                  <TableCell>
+                    {revealed[p.id] !== undefined ? (
+                      revealed[p.id] ?? "(未填)"
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleReveal(p.id)}
+                      >
+                        <Eye />
+                        顯示
+                      </Button>
+                    )}
+                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      {p.user_id ? (
+                        <span className="text-sm text-muted-foreground">已建立</span>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setAccountFormPlayerId(p.id);
+                            setAccountError(null);
+                          }}
+                        >
+                          建立登入帳號
+                        </Button>
+                      )}
+                    </TableCell>
                   )}
-                </td>
+                </TableRow>
+              ))}
+              {playersQuery.data?.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={isAdmin ? 9 : 8} className="text-center text-muted-foreground">
+                    尚無球員。
+                  </TableCell>
+                </TableRow>
               )}
-            </tr>
-          ))}
-          {playersQuery.data?.length === 0 && (
-            <tr>
-              <td style={tdStyle} colSpan={isAdmin ? 9 : 8}>
-                尚無球員。
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-
-      {accountFormPlayerId !== null && (
-        <form
-          onSubmit={handleCreatePlayerAccount}
-          style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", alignItems: "center" }}
-        >
-          <span>為球員建立登入帳號:</span>
-          <input
-            type="email" placeholder="Email" value={accountEmail}
-            onChange={(e) => setAccountEmail(e.target.value)} required
-          />
-          <input
-            type="password" placeholder="初始密碼" value={accountPassword}
-            onChange={(e) => setAccountPassword(e.target.value)} required
-          />
-          <button type="submit" disabled={accountSubmitting}>
-            {accountSubmitting ? "建立中…" : "建立"}
-          </button>
-          <button type="button" onClick={() => setAccountFormPlayerId(null)}>
-            取消
-          </button>
-        </form>
-      )}
-      {accountError && <p style={{ color: "crimson" }}>{accountError}</p>}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {isAdmin && (
         <>
-          <h2 style={{ fontSize: "1.1rem", marginTop: "2rem" }}>手動新增球員</h2>
-          <form onSubmit={handleAddPlayer} style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-            <input placeholder="姓名" value={pName} onChange={(e) => setPName(e.target.value)} required />
-            <input
-              placeholder="背號" type="number" value={pNumber}
-              onChange={(e) => setPNumber(e.target.value)} required style={{ width: 80 }}
-            />
-            <input placeholder="守位" value={pPositions} onChange={(e) => setPPositions(e.target.value)} />
-            <select value={pTitle} onChange={(e) => setPTitle(e.target.value)}>
-              {Object.entries(TITLE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <input type="date" value={pBirthdate} onChange={(e) => setPBirthdate(e.target.value)} />
-            <input
-              placeholder="身分證字號" value={pNationalId}
-              onChange={(e) => setPNationalId(e.target.value)}
-            />
-            <input placeholder="Email" type="email" value={pEmail} onChange={(e) => setPEmail(e.target.value)} />
-            <input placeholder="電話" value={pPhone} onChange={(e) => setPPhone(e.target.value)} />
-            <button type="submit" disabled={addSubmitting}>
-              {addSubmitting ? "新增中…" : "新增球員"}
-            </button>
-          </form>
-          {addError && <p style={{ color: "crimson" }}>{addError}</p>}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>手動新增球員</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleAddPlayer} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <FormField label="姓名" htmlFor="p-name" required>
+                  <Input id="p-name" value={pName} onChange={(e) => setPName(e.target.value)} required />
+                </FormField>
+                <FormField label="背號" htmlFor="p-number" required>
+                  <Input
+                    id="p-number"
+                    type="number"
+                    value={pNumber}
+                    onChange={(e) => setPNumber(e.target.value)}
+                    required
+                  />
+                </FormField>
+                <FormField label="守位" htmlFor="p-positions">
+                  <Input id="p-positions" value={pPositions} onChange={(e) => setPPositions(e.target.value)} />
+                </FormField>
+                <FormField label="職稱" htmlFor="p-title">
+                  <Select value={pTitle} onValueChange={setPTitle}>
+                    <SelectTrigger id="p-title" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(TITLE_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="生日" htmlFor="p-birthdate">
+                  <Input
+                    id="p-birthdate"
+                    type="date"
+                    value={pBirthdate}
+                    onChange={(e) => setPBirthdate(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="身分證字號" htmlFor="p-national-id">
+                  <Input
+                    id="p-national-id"
+                    value={pNationalId}
+                    onChange={(e) => setPNationalId(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Email" htmlFor="p-email">
+                  <Input id="p-email" type="email" value={pEmail} onChange={(e) => setPEmail(e.target.value)} />
+                </FormField>
+                <FormField label="電話" htmlFor="p-phone">
+                  <Input id="p-phone" value={pPhone} onChange={(e) => setPPhone(e.target.value)} />
+                </FormField>
+                <div className="col-span-2 sm:col-span-4">
+                  <Button type="submit" disabled={addSubmitting}>
+                    {addSubmitting ? "新增中…" : "新增球員"}
+                  </Button>
+                </div>
+              </form>
+              <FormError message={addError} />
+            </CardContent>
+          </Card>
 
-          <h2 style={{ fontSize: "1.1rem", marginTop: "2rem" }}>Excel 匯入球員名單</h2>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.5rem" }}>
-            <button type="button" onClick={() => downloadRosterTemplate(teamId)}>
-              下載範本
-            </button>
-            <select value={importMode} onChange={(e) => setImportMode(e.target.value as "append" | "replace")}>
-              <option value="append">附加(保留原名單)</option>
-              <option value="replace">取代(原名單設為離隊)</option>
-            </select>
-            <input type="file" accept=".xlsx" onChange={handleImportFile} disabled={importBusy} />
-          </div>
-          {pendingFile && (
-            <div style={{ marginBottom: "0.5rem" }}>
-              <p>
-                預覽通過,共 {importResult?.valid_rows} 筆。確定要取代目前名單嗎?此動作會將現有球員標記為離隊。
-              </p>
-              <button type="button" onClick={handleConfirmReplace} disabled={importBusy}>
-                {importBusy ? "處理中…" : "確認取代"}
-              </button>
-            </div>
-          )}
-          {importError && <p style={{ color: "crimson" }}>{importError}</p>}
-          {importResult && importResult.errors.length > 0 && (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>列</th>
-                  <th style={thStyle}>欄位</th>
-                  <th style={thStyle}>錯誤</th>
-                </tr>
-              </thead>
-              <tbody>
-                {importResult.errors.map((e, i) => (
-                  <tr key={i}>
-                    <td style={tdStyle}>{e.row}</td>
-                    <td style={tdStyle}>{e.field}</td>
-                    <td style={tdStyle}>{e.msg}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {importResult && importResult.committed && (
-            <p style={{ color: "green" }}>匯入成功,共 {importResult.valid_rows} 筆。</p>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Excel 匯入球員名單</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <Button type="button" variant="outline" onClick={() => downloadRosterTemplate(teamId)}>
+                  下載範本
+                </Button>
+                <Select value={importMode} onValueChange={(v) => setImportMode(v as "append" | "replace")}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="append">附加（保留原名單）</SelectItem>
+                    <SelectItem value="replace">取代（原名單設為離隊）</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="file"
+                  accept=".xlsx"
+                  onChange={handleImportFile}
+                  disabled={importBusy}
+                  className="max-w-xs"
+                />
+              </div>
+              <FormError message={importError} />
+              {importResult && importResult.errors.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>列</TableHead>
+                      <TableHead>欄位</TableHead>
+                      <TableHead>錯誤</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importResult.errors.map((e, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{e.row}</TableCell>
+                        <TableCell>{e.field}</TableCell>
+                        <TableCell>{e.msg}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              {importResult && importResult.committed && (
+                <FormSuccess message={`匯入成功，共 ${importResult.valid_rows} 筆。`} />
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
+
+      <Dialog open={showCaptainForm} onOpenChange={setShowCaptainForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>建立隊長帳號</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateCaptain} className="grid gap-4">
+            <FormField label="隊長 Email" htmlFor="captain-email" required>
+              <Input
+                id="captain-email"
+                type="email"
+                value={captainEmail}
+                onChange={(e) => setCaptainEmail(e.target.value)}
+                required
+              />
+            </FormField>
+            <FormField label="姓名" htmlFor="captain-name" required>
+              <Input
+                id="captain-name"
+                value={captainName}
+                onChange={(e) => setCaptainName(e.target.value)}
+                required
+              />
+            </FormField>
+            <FormField label="初始密碼" htmlFor="captain-password" required>
+              <Input
+                id="captain-password"
+                type="password"
+                value={captainPassword}
+                onChange={(e) => setCaptainPassword(e.target.value)}
+                required
+              />
+            </FormField>
+            <FormError message={captainError} />
+            <Button type="submit" disabled={captainSubmitting}>
+              {captainSubmitting ? "建立中…" : "建立"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={accountFormPlayerId !== null}
+        onOpenChange={(open) => {
+          if (!open) setAccountFormPlayerId(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>為球員建立登入帳號</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreatePlayerAccount} className="grid gap-4">
+            <FormField label="Email" htmlFor="account-email" required>
+              <Input
+                id="account-email"
+                type="email"
+                value={accountEmail}
+                onChange={(e) => setAccountEmail(e.target.value)}
+                required
+              />
+            </FormField>
+            <FormField label="初始密碼" htmlFor="account-password" required>
+              <Input
+                id="account-password"
+                type="password"
+                value={accountPassword}
+                onChange={(e) => setAccountPassword(e.target.value)}
+                required
+              />
+            </FormField>
+            <FormError message={accountError} />
+            <Button type="submit" disabled={accountSubmitting}>
+              {accountSubmitting ? "建立中…" : "建立"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={pendingFile !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingFile(null);
+        }}
+        title="確認取代目前名單？"
+        description={`預覽通過，共 ${importResult?.valid_rows ?? 0} 筆。此動作會將現有球員標記為離隊。`}
+        confirmLabel="確認取代"
+        onConfirm={handleConfirmReplace}
+        busy={importBusy}
+        destructive
+      />
     </div>
   );
 }
-
-const thStyle = { textAlign: "left" as const, borderBottom: "1px solid #ddd", padding: "0.4rem" };
-const tdStyle = { borderBottom: "1px solid #eee", padding: "0.4rem" };

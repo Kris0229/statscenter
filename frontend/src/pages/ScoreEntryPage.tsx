@@ -15,8 +15,13 @@ import {
   putBattingLines,
   putPitchingLines,
   validateGame,
-} from "../api/client";
-import type { BattingLine, GameLineScore, PitchingLine, ValidateResult } from "../api/types";
+} from "@/api/client";
+import type { BattingLine, GameLineScore, PitchingLine, ValidateResult } from "@/api/types";
+import { FormError } from "@/components/FormStatus";
+import { LoadingBlock } from "@/components/Loading";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { BattingGrid } from "./scoreEntry/BattingGrid";
 import { LineScoreEntry } from "./scoreEntry/LineScoreEntry";
 import { PitchingGrid } from "./scoreEntry/PitchingGrid";
@@ -227,9 +232,9 @@ export function ScoreEntryPage() {
     }
   }
 
-  if (initialDataQuery.isLoading || !seeded) return <p>載入中…</p>;
+  if (initialDataQuery.isLoading || !seeded) return <LoadingBlock />;
   if (initialDataQuery.isError || !initialDataQuery.data) {
-    return <p style={{ color: "crimson" }}>無法載入比賽資料</p>;
+    return <FormError message="無法載入比賽資料" />;
   }
 
   const { homeTeam, awayTeam, homePlayers, awayPlayers } = initialDataQuery.data;
@@ -243,30 +248,32 @@ export function ScoreEntryPage() {
 
   return (
     <div>
-      <h1>
+      <h1 className="text-2xl font-bold tracking-tight text-foreground">
         {awayTeam.name} @ {homeTeam.name} — 計分表
       </h1>
 
-      <LineScoreEntry
-        innings={innings}
-        awayName={awayTeam.name}
-        homeName={homeTeam.name}
-        awayRuns={lineScore.away}
-        homeRuns={lineScore.home}
-        awayE={lineScore.away_e ?? 0}
-        homeE={lineScore.home_e ?? 0}
-        awayLob={lineScore.away_lob ?? 0}
-        homeLob={lineScore.home_lob ?? 0}
-        onChange={handleLineScoreChange}
-      />
+      <div className="mt-4">
+        <LineScoreEntry
+          innings={innings}
+          awayName={awayTeam.name}
+          homeName={homeTeam.name}
+          awayRuns={lineScore.away}
+          homeRuns={lineScore.home}
+          awayE={lineScore.away_e ?? 0}
+          homeE={lineScore.home_e ?? 0}
+          awayLob={lineScore.away_lob ?? 0}
+          homeLob={lineScore.home_lob ?? 0}
+          onChange={handleLineScoreChange}
+        />
+      </div>
 
-      <h2>{awayTeam.name}(客隊)打擊</h2>
+      <h2 className="mt-6 mb-2 text-lg font-semibold text-foreground">{awayTeam.name}（客隊）打擊</h2>
       <BattingGrid
         players={awayPlayers}
         lines={awayBatting}
         onChange={(id, field, value) => handleBattingChange("away", id, field, value)}
       />
-      <h2>{awayTeam.name} 投手</h2>
+      <h2 className="mt-6 mb-2 text-lg font-semibold text-foreground">{awayTeam.name} 投手</h2>
       <PitchingGrid
         players={awayPlayers}
         lines={awayPitching}
@@ -275,13 +282,13 @@ export function ScoreEntryPage() {
         onRemovePitcher={(i) => handleRemovePitcher("away", i)}
       />
 
-      <h2>{homeTeam.name}(主隊)打擊</h2>
+      <h2 className="mt-6 mb-2 text-lg font-semibold text-foreground">{homeTeam.name}（主隊）打擊</h2>
       <BattingGrid
         players={homePlayers}
         lines={homeBatting}
         onChange={(id, field, value) => handleBattingChange("home", id, field, value)}
       />
-      <h2>{homeTeam.name} 投手</h2>
+      <h2 className="mt-6 mb-2 text-lg font-semibold text-foreground">{homeTeam.name} 投手</h2>
       <PitchingGrid
         players={homePlayers}
         lines={homePitching}
@@ -290,35 +297,37 @@ export function ScoreEntryPage() {
         onRemovePitcher={(i) => handleRemovePitcher("home", i)}
       />
 
-      <div>
-        <p className={awayCheck.ok ? "check-ok" : "check-fail"}>
-          {awayCheck.ok ? "✓" : "✗"} {awayTeam.name} R+LOB+PO 檢查:R{awayCheck.r} + LOB{awayCheck.lob}{" "}
-          + PO{awayCheck.po} {awayCheck.ok ? "=" : "≠"} PA{awayCheck.pa}
-        </p>
-        <p className={homeCheck.ok ? "check-ok" : "check-fail"}>
-          {homeCheck.ok ? "✓" : "✗"} {homeTeam.name} R+LOB+PO 檢查:R{homeCheck.r} + LOB{homeCheck.lob}{" "}
-          + PO{homeCheck.po} {homeCheck.ok ? "=" : "≠"} PA{homeCheck.pa}
-        </p>
-      </div>
+      <Card className="mt-6">
+        <CardContent className="grid gap-1 text-sm">
+          <p className={awayCheck.ok ? "text-success" : "text-destructive"}>
+            {awayCheck.ok ? "✓" : "✗"} {awayTeam.name} R+LOB+PO 檢查:R{awayCheck.r} + LOB{awayCheck.lob}{" "}
+            + PO{awayCheck.po} {awayCheck.ok ? "=" : "≠"} PA{awayCheck.pa}
+          </p>
+          <p className={homeCheck.ok ? "text-success" : "text-destructive"}>
+            {homeCheck.ok ? "✓" : "✗"} {homeTeam.name} R+LOB+PO 檢查:R{homeCheck.r} + LOB{homeCheck.lob}{" "}
+            + PO{homeCheck.po} {homeCheck.ok ? "=" : "≠"} PA{homeCheck.pa}
+          </p>
+        </CardContent>
+      </Card>
 
-      <div className="score-entry-actions">
-        <button type="button" onClick={handleSave} disabled={saving}>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Button type="button" variant="outline" onClick={handleSave} disabled={saving}>
           {saving ? "儲存中…" : "儲存"}
-        </button>
-        <button type="button" onClick={handleValidate} disabled={validating}>
+        </Button>
+        <Button type="button" variant="outline" onClick={handleValidate} disabled={validating}>
           {validating ? "驗證中…" : "伺服器驗證"}
-        </button>
-        <button type="button" onClick={handleFinalize} disabled={finalizing || !validateResult?.ok}>
+        </Button>
+        <Button type="button" onClick={handleFinalize} disabled={finalizing || !validateResult?.ok}>
           {finalizing ? "完賽中…" : "完賽"}
-        </button>
+        </Button>
       </div>
 
-      {actionError && <p style={{ color: "crimson" }}>{actionError}</p>}
+      <FormError message={actionError} />
 
       {validateResult && (
-        <ul className="check-list">
+        <ul className="mt-4 grid gap-1 text-sm">
           {validateResult.checks.map((c) => (
-            <li key={c.name} className={c.ok ? "check-ok" : "check-fail"}>
+            <li key={c.name} className={cn(c.ok ? "text-success" : "text-destructive")}>
               {c.ok ? "✓" : "✗"} {c.name}:{c.detail}
             </li>
           ))}
