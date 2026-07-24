@@ -25,7 +25,7 @@ function navLinkClassName({ isActive }: { isActive: boolean }) {
   return cn(
     "border-b-2 px-1 py-1 text-sm font-medium transition-colors",
     isActive
-      ? "border-accent text-white"
+      ? "border-brand text-white"
       : "border-transparent text-white/70 hover:text-white",
   );
 }

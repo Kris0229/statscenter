@@ -25,9 +25,13 @@
   --muted: #f1f3f6;
   --muted-foreground: #64748b;
 
-  /* 活力橘 — CTA、active nav、強調 */
-  --accent: #f97316;
-  --accent-foreground: #1a1a1a;
+  /* 中性提示色 — Skeleton、下拉選單 hover、Badge outline 等淡色提示用途 */
+  --accent: #f1f3f6;
+  --accent-foreground: #1e293b;
+
+  /* 活力橘 — 品牌強調色，只用在明確需要「強調」的地方（如 active nav 底線） */
+  --brand: #f97316;
+  --brand-foreground: #1a1a1a;
 
   /* 對應現有 crimson 錯誤慣例 */
   --destructive: #dc2626;
@@ -61,6 +65,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);

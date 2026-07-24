@@ -28,6 +28,7 @@ import { LineScoreEntry } from "./scoreEntry/LineScoreEntry";
 import type { PitchingRowState } from "./scoreEntry/PitchingGrid";
 import { PitchingGrid, blankPitchingLine, blankPitchingRow } from "./scoreEntry/PitchingGrid";
 import "./scoreEntry/ScoreEntryPage.css";
+import { TerminologyDialog } from "./scoreEntry/Terminology";
 import { computeRLobPo } from "./scoreEntry/validation";
 
 const DEFAULT_BATTING_ROWS = 10;
@@ -320,9 +321,12 @@ export function ScoreEntryPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-foreground">
-        {awayTeam.name} @ {homeTeam.name} — 計分表
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          {awayTeam.name} @ {homeTeam.name} — 計分表
+        </h1>
+        <TerminologyDialog />
+      </div>
 
       <div className="mt-4">
         <LineScoreEntry

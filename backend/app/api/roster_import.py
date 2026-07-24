@@ -90,7 +90,7 @@ def import_roster(
             Player(
                 league_id=league_id, team_id=team.id, name=r.name, number=r.number,
                 positions=r.positions, bats=r.bats, throws=r.throws, title=r.title,
-                birthdate=r.birthdate, national_id=r.national_id, email=r.email, phone=r.phone,
+                birthdate=r.birthdate, email=r.email, phone=r.phone,
             ),
         )
     db.commit()

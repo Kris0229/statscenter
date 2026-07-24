@@ -9,17 +9,29 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 import openpyxl
+from openpyxl.styles import Font, PatternFill
 
-TEMPLATE_COLUMNS = [
-    "number", "name", "positions", "bats_throws",
-    "title", "birthdate", "national_id", "email", "phone",
-]
+# Chinese column header -> internal field key. The template is Chinese-only;
+# national_id is intentionally excluded from bulk import (still settable
+# per-player via the manual add-player form) since it's sensitive PII that
+# shouldn't be handled as a bulk spreadsheet column.
+_FIELD_KEYS = {
+    "背號": "number",
+    "姓名": "name",
+    "守位": "positions",
+    "打投": "bats_throws",
+    "職稱": "title",
+    "生日": "birthdate",
+    "電子郵件": "email",
+    "電話": "phone",
+}
+TEMPLATE_COLUMNS = list(_FIELD_KEYS.keys())
+
+_SAMPLE_ROW = [7, "王小明（範例，請刪除本列）", "OF", "R/R", "隊員", "2000-01-15", "example@mail.com", "0912345678"]
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _BATS_VALUES = {"R", "L", "S"}
 _THROWS_VALUES = {"R", "L"}
-# Taiwan national ID: 1 letter + 9 digits.
-_NATIONAL_ID_RE = re.compile(r"^[A-Za-z]\d{9}$")
 _TITLE_LABELS = {"領隊": "manager", "教練": "coach", "隊長": "captain", "隊員": "member"}
 _TITLE_VALUES = set(_TITLE_LABELS.values())
 
@@ -34,7 +46,6 @@ class RosterRow:
     throws: str | None
     title: str
     birthdate: date | None
-    national_id: str | None
     email: str | None
     phone: str | None
 
@@ -57,6 +68,10 @@ def build_template_workbook() -> openpyxl.Workbook:
     ws = wb.active
     ws.title = "roster"
     ws.append(TEMPLATE_COLUMNS)
+    ws.append(_SAMPLE_ROW)
+    sample_style = (Font(italic=True, color="808080"), PatternFill("solid", fgColor="F2F2F2"))
+    for cell in ws[2]:
+        cell.font, cell.fill = sample_style
     return wb
 
 
@@ -82,8 +97,8 @@ def parse_roster_workbook(content: bytes) -> ParseResult:
     ws = wb["roster"] if "roster" in wb.sheetnames else wb.active
 
     header_row = next(ws.iter_rows(min_row=1, max_row=1), ())
-    header = [str(c.value).strip().lower() if c.value is not None else "" for c in header_row]
-    col_index = {name: i for i, name in enumerate(header)}
+    header = [str(c.value).strip() if c.value is not None else "" for c in header_row]
+    col_index = {_FIELD_KEYS[name]: i for i, name in enumerate(header) if name in _FIELD_KEYS}
 
     missing = [c for c in ("number", "name") if c not in col_index]
     if missing:
@@ -182,16 +197,6 @@ def parse_roster_workbook(content: bytes) -> ParseResult:
                 errors.append(RowError(row=row_idx, field="birthdate", msg=err))
                 row_ok = False
 
-        national_id: str | None = None
-        raw_national_id = get(values, "national_id")
-        if not _blank(raw_national_id):
-            national_id = str(raw_national_id).strip().upper()
-            if not _NATIONAL_ID_RE.match(national_id):
-                errors.append(
-                    RowError(row=row_idx, field="national_id", msg="expected 1 letter + 9 digits"),
-                )
-                row_ok = False
-
         email: str | None = None
         raw_email = get(values, "email")
         if not _blank(raw_email):
@@ -222,7 +227,7 @@ def parse_roster_workbook(content: bytes) -> ParseResult:
                 RosterRow(
                     row=row_idx, number=number, name=name, positions=positions,  # type: ignore[arg-type]
                     bats=bats, throws=throws, title=title, birthdate=birthdate,
-                    national_id=national_id, email=email, phone=phone,
+                    email=email, phone=phone,
                 ),
             )
 

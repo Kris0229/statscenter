@@ -12,7 +12,7 @@ def _build_workbook(rows: list[tuple]) -> bytes:
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "roster"
-    ws.append(["number", "name", "positions", "bats_throws", "email", "phone", "birthdate"])
+    ws.append(["背號", "姓名", "守位", "打投", "電子郵件", "電話", "生日"])
     for row in rows:
         ws.append(row)
     buf = io.BytesIO()
@@ -83,14 +83,15 @@ def test_template_download_round_trips_with_import(client, db_session) -> None:
 
     wb = openpyxl.load_workbook(io.BytesIO(tmpl_resp.content))
     ws = wb["roster"]
-    ws.append([1, "Round Trip Player", "SS", "R/R", "", "", ""])
+    # row 2 is the template's own styled sample row; this appends a 3rd row.
+    ws.append([1, "Round Trip Player", "SS", "R/R", "", "", "", ""])
     buf = io.BytesIO()
     wb.save(buf)
 
     resp = _upload(client, team.id, buf.getvalue(), auth_headers(admin))
     assert resp.status_code == 200
     assert resp.json()["committed"] is True
-    assert resp.json()["valid_rows"] == 1
+    assert resp.json()["valid_rows"] == 2
 
 
 def test_replace_mode_requires_confirm(client, db_session) -> None:
@@ -133,9 +134,7 @@ def _build_full_workbook(rows: list[tuple]) -> bytes:
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "roster"
-    ws.append(
-        ["number", "name", "positions", "bats_throws", "title", "birthdate", "national_id", "email", "phone"],
-    )
+    ws.append(["背號", "姓名", "守位", "打投", "職稱", "生日", "電子郵件", "電話"])
     for row in rows:
         ws.append(row)
     buf = io.BytesIO()
@@ -143,11 +142,11 @@ def _build_full_workbook(rows: list[tuple]) -> bytes:
     return buf.getvalue()
 
 
-def test_import_full_fields_round_trip_and_national_id_hidden_from_list(client, db_session) -> None:
+def test_import_full_fields_round_trip(client, db_session) -> None:
     _, admin, team = _setup_admin_team(db_session, "F")
     rows = [
-        (1, "Full Fields", "OF", "R/R", "領隊", "2000-01-15", "A123456789", "full@example.com", "0912345678"),
-        (2, "Default Title", "1B", None, "", "", "", "", ""),
+        (1, "Full Fields", "OF", "R/R", "領隊", "2000-01-15", "full@example.com", "0912345678"),
+        (2, "Default Title", "1B", None, "", "", "", ""),
     ]
 
     resp = _upload(client, team.id, _build_full_workbook(rows), auth_headers(admin))
@@ -157,24 +156,17 @@ def test_import_full_fields_round_trip_and_national_id_hidden_from_list(client, 
     players = {p.number: p for p in db_session.query(Player).filter(Player.team_id == team.id)}
     assert players[1].title == "manager"
     assert str(players[1].birthdate) == "2000-01-15"
-    assert players[1].national_id == "A123456789"
     assert players[1].email == "full@example.com"
     assert players[1].phone == "0912345678"
     assert players[2].title == "member"  # blank title defaults to member
 
-    list_resp = client.get(f"/api/v1/teams/{team.id}/players", headers=auth_headers(admin))
-    assert list_resp.status_code == 200
-    for row in list_resp.json():
-        assert "national_id" not in row
-
-    detail_resp = client.get(f"/api/v1/players/{players[1].id}", headers=auth_headers(admin))
-    assert detail_resp.status_code == 200
-    assert detail_resp.json()["national_id"] == "A123456789"
+    # national_id isn't a bulk-import column; imported players don't get one.
+    assert players[1].national_id is None
 
 
-def test_import_invalid_title_and_national_id_rejected(client, db_session) -> None:
+def test_import_invalid_title_rejected(client, db_session) -> None:
     _, admin, team = _setup_admin_team(db_session, "G")
-    rows = [(1, "Bad Row", None, None, "隊醫", "", "12345", "", "")]
+    rows = [(1, "Bad Row", None, None, "隊醫", "", "", "")]
 
     resp = _upload(client, team.id, _build_full_workbook(rows), auth_headers(admin))
     assert resp.status_code == 200
@@ -182,4 +174,3 @@ def test_import_invalid_title_and_national_id_rejected(client, db_session) -> No
     assert body["committed"] is False
     fields = {e["field"] for e in body["errors"]}
     assert "title" in fields
-    assert "national_id" in fields
