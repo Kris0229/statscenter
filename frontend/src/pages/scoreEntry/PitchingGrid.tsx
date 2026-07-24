@@ -1,6 +1,22 @@
 import type { PitchingLine, Player } from "../../api/types";
 import { useGridNav } from "./gridNavigation";
 
+export interface PitchingRowState {
+  line: PitchingLine;
+  numberText: string;
+}
+
+export function blankPitchingLine(): PitchingLine {
+  return {
+    player_id: 0, seq: 1, decision: "none", outs: 0, np: 0, bf: 0, ab: 0, h: 0, hr: 0,
+    bb: 0, hp: 0, so: 0, r: 0, er: 0, wp: 0, gs: false, cg: false, sho: false, sv: false, svo: false,
+  };
+}
+
+export function blankPitchingRow(): PitchingRowState {
+  return { line: blankPitchingLine(), numberText: "" };
+}
+
 interface NumCol {
   key: keyof PitchingLine;
   label: string;
@@ -33,18 +49,21 @@ const DECISIONS = ["none", "W", "L", "SV", "BS", "HLD", "SVO"];
 
 interface PitchingGridProps {
   players: Player[];
-  lines: PitchingLine[];
+  rows: PitchingRowState[];
   onChange: (index: number, field: keyof PitchingLine, value: number | string | boolean) => void;
+  onNumberChange: (index: number, value: string) => void;
+  onNumberBlur: (index: number) => void;
   onAddPitcher: () => void;
   onRemovePitcher: (index: number) => void;
 }
 
 export function PitchingGrid({
-  players, lines, onChange, onAddPitcher, onRemovePitcher,
+  players, rows, onChange, onNumberChange, onNumberBlur, onAddPitcher, onRemovePitcher,
 }: PitchingGridProps) {
   const { registerCell, handleKeyDown } = useGridNav();
-  // numeric columns start after the 2 select columns (player, decision)
-  const numericColOffset = 2;
+  // numeric columns start after the 背號 input (col 0); the decision <select>
+  // sits between them in DOM order but, like before, isn't part of arrow-key nav.
+  const numericColOffset = 1;
   const flagColOffset = numericColOffset + NUMERIC_COLUMNS.length;
 
   return (
@@ -53,6 +72,7 @@ export function PitchingGrid({
         <thead>
           <tr>
             <th className="name-cell">投手</th>
+            <th>背號</th>
             <th>勝敗</th>
             {NUMERIC_COLUMNS.map((c) => (
               <th key={c.key}>{c.label}</th>
@@ -64,67 +84,70 @@ export function PitchingGrid({
           </tr>
         </thead>
         <tbody>
-          {lines.map((line, row) => (
-            <tr key={row}>
-              <td className="name-cell">
-                <select
-                  value={line.player_id || ""}
-                  onChange={(e) => onChange(row, "player_id", Number(e.target.value))}
-                >
-                  <option value="">選擇投手</option>
-                  {players.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.number} {p.name}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <select
-                  value={line.decision}
-                  onChange={(e) => onChange(row, "decision", e.target.value)}
-                >
-                  {DECISIONS.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              {NUMERIC_COLUMNS.map((col, i) => (
-                <td key={col.key}>
+          {rows.map((row, rowIndex) => {
+            const { line } = row;
+            const player = players.find((p) => p.id === line.player_id);
+            return (
+              <tr key={rowIndex}>
+                <td className="name-cell">{player?.name ?? ""}</td>
+                <td>
                   <input
-                    ref={registerCell(row, numericColOffset + i)}
+                    ref={registerCell(rowIndex, 0)}
                     type="number"
                     className="grid-cell"
-                    value={line[col.key] as number}
-                    onChange={(e) => onChange(row, col.key, Number(e.target.value) || 0)}
-                    onKeyDown={handleKeyDown(row, numericColOffset + i)}
+                    value={row.numberText}
+                    onChange={(e) => onNumberChange(rowIndex, e.target.value)}
+                    onBlur={() => onNumberBlur(rowIndex)}
+                    onKeyDown={handleKeyDown(rowIndex, 0)}
                   />
                 </td>
-              ))}
-              {FLAG_COLUMNS.map((col, i) => (
-                <td key={col.key}>
-                  <input
-                    ref={registerCell(row, flagColOffset + i)}
-                    type="checkbox"
-                    checked={line[col.key] as boolean}
-                    onChange={(e) => onChange(row, col.key, e.target.checked)}
-                    onKeyDown={handleKeyDown(row, flagColOffset + i)}
-                  />
+                <td>
+                  <select
+                    value={line.decision}
+                    onChange={(e) => onChange(rowIndex, "decision", e.target.value)}
+                  >
+                    {DECISIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
                 </td>
-              ))}
-              <td>
-                <button
-                  type="button"
-                  onClick={() => onRemovePitcher(row)}
-                  className="text-xs text-destructive hover:underline"
-                >
-                  移除
-                </button>
-              </td>
-            </tr>
-          ))}
+                {NUMERIC_COLUMNS.map((col, i) => (
+                  <td key={col.key}>
+                    <input
+                      ref={registerCell(rowIndex, numericColOffset + i)}
+                      type="number"
+                      className="grid-cell"
+                      value={line[col.key] as number}
+                      onChange={(e) => onChange(rowIndex, col.key, Number(e.target.value) || 0)}
+                      onKeyDown={handleKeyDown(rowIndex, numericColOffset + i)}
+                    />
+                  </td>
+                ))}
+                {FLAG_COLUMNS.map((col, i) => (
+                  <td key={col.key}>
+                    <input
+                      ref={registerCell(rowIndex, flagColOffset + i)}
+                      type="checkbox"
+                      checked={line[col.key] as boolean}
+                      onChange={(e) => onChange(rowIndex, col.key, e.target.checked)}
+                      onKeyDown={handleKeyDown(rowIndex, flagColOffset + i)}
+                    />
+                  </td>
+                ))}
+                <td>
+                  <button
+                    type="button"
+                    onClick={() => onRemovePitcher(rowIndex)}
+                    className="text-xs text-destructive hover:underline"
+                  >
+                    移除
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <button

@@ -22,26 +22,15 @@ import { LoadingBlock } from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { BattingGrid } from "./scoreEntry/BattingGrid";
+import type { BattingRow } from "./scoreEntry/BattingGrid";
+import { BattingGrid, blankBattingRow } from "./scoreEntry/BattingGrid";
 import { LineScoreEntry } from "./scoreEntry/LineScoreEntry";
-import { PitchingGrid } from "./scoreEntry/PitchingGrid";
+import type { PitchingRowState } from "./scoreEntry/PitchingGrid";
+import { PitchingGrid, blankPitchingLine, blankPitchingRow } from "./scoreEntry/PitchingGrid";
 import "./scoreEntry/ScoreEntryPage.css";
 import { computeRLobPo } from "./scoreEntry/validation";
 
-function blankBattingLine(playerId: number, batOrder: number): BattingLine {
-  return {
-    player_id: playerId, bat_order: batOrder, sub_index: 0, pos: "",
-    pa: 0, ab: 0, sh: 0, sf: 0, bb: 0, hp: 0, io: 0, tie: 0,
-    r: 0, h: 0, b2: 0, b3: 0, hr: 0, rbi: 0, so: 0, sb: 0, cs: 0, gidp: 0, e: 0,
-  };
-}
-
-function blankPitchingLine(): PitchingLine {
-  return {
-    player_id: 0, seq: 1, decision: "none", outs: 0, np: 0, bf: 0, ab: 0, h: 0, hr: 0,
-    bb: 0, hp: 0, so: 0, r: 0, er: 0, wp: 0, gs: false, cg: false, sho: false, sv: false, svo: false,
-  };
-}
+const DEFAULT_BATTING_ROWS = 10;
 
 const emptyLineScore: GameLineScore = {
   home: [], away: [], home_e: 0, away_e: 0, home_lob: 0, away_lob: 0,
@@ -73,10 +62,10 @@ export function ScoreEntryPage() {
 
   const [seeded, setSeeded] = useState(false);
   const [innings, setInnings] = useState(7);
-  const [homeBatting, setHomeBatting] = useState<Map<number, BattingLine>>(new Map());
-  const [awayBatting, setAwayBatting] = useState<Map<number, BattingLine>>(new Map());
-  const [homePitching, setHomePitching] = useState<PitchingLine[]>([]);
-  const [awayPitching, setAwayPitching] = useState<PitchingLine[]>([]);
+  const [homeBatting, setHomeBatting] = useState<BattingRow[]>([]);
+  const [awayBatting, setAwayBatting] = useState<BattingRow[]>([]);
+  const [homePitching, setHomePitching] = useState<PitchingRowState[]>([]);
+  const [awayPitching, setAwayPitching] = useState<PitchingRowState[]>([]);
   const [lineScore, setLineScore] = useState<GameLineScore>(emptyLineScore);
 
   const [validateResult, setValidateResult] = useState<ValidateResult | null>(null);
@@ -93,23 +82,34 @@ export function ScoreEntryPage() {
     const inn = season?.innings_per_game ?? 7;
     setInnings(inn);
 
-    const seedTeam = (players: typeof homePlayers) => {
-      const m = new Map<number, BattingLine>();
-      players.forEach((p, i) => {
-        const existing = battingLines.find((l) => l.player_id === p.id);
-        m.set(p.id, existing ?? blankBattingLine(p.id, i + 1));
-      });
-      return m;
-    };
-    setHomeBatting(seedTeam(homePlayers));
-    setAwayBatting(seedTeam(awayPlayers));
-
     const homeIds = new Set(homePlayers.map((p) => p.id));
     const awayIds = new Set(awayPlayers.map((p) => p.id));
-    const homeP = pitchingLines.filter((l) => homeIds.has(l.player_id));
-    const awayP = pitchingLines.filter((l) => awayIds.has(l.player_id));
-    setHomePitching(homeP.length > 0 ? homeP : [blankPitchingLine()]);
-    setAwayPitching(awayP.length > 0 ? awayP : [blankPitchingLine()]);
+
+    const seedBattingTeam = (roster: typeof homePlayers, teamIds: Set<number>) => {
+      const existing = battingLines
+        .filter((l) => teamIds.has(l.player_id))
+        .slice()
+        .sort((a, b) => (a.bat_order ?? 999) - (b.bat_order ?? 999));
+      const rows: BattingRow[] = existing.map((line) => ({
+        line,
+        numberText: roster.find((p) => p.id === line.player_id)?.number?.toString() ?? "",
+      }));
+      while (rows.length < DEFAULT_BATTING_ROWS) rows.push(blankBattingRow());
+      return rows;
+    };
+    setHomeBatting(seedBattingTeam(homePlayers, homeIds));
+    setAwayBatting(seedBattingTeam(awayPlayers, awayIds));
+
+    const seedPitchingTeam = (roster: typeof homePlayers, teamIds: Set<number>) => {
+      const existing = pitchingLines.filter((l) => teamIds.has(l.player_id));
+      const rows: PitchingRowState[] = existing.map((line) => ({
+        line,
+        numberText: roster.find((p) => p.id === line.player_id)?.number?.toString() ?? "",
+      }));
+      return rows.length > 0 ? rows : [blankPitchingRow()];
+    };
+    setHomePitching(seedPitchingTeam(homePlayers, homeIds));
+    setAwayPitching(seedPitchingTeam(awayPlayers, awayIds));
 
     const ls = (game.line_score ?? {}) as Partial<GameLineScore>;
     setLineScore({
@@ -126,18 +126,56 @@ export function ScoreEntryPage() {
 
   function handleBattingChange(
     team: "home" | "away",
-    playerId: number,
+    index: number,
     field: keyof BattingLine,
     value: number | string | null,
   ) {
     const setter = team === "home" ? setHomeBatting : setAwayBatting;
-    setter((prev) => {
-      const line = prev.get(playerId);
-      if (!line) return prev;
-      const next = new Map(prev);
-      next.set(playerId, { ...line, [field]: value });
-      return next;
-    });
+    setter((prev) => prev.map((row, i) => (i === index ? { ...row, line: { ...row.line, [field]: value } } : row)));
+  }
+
+  function handleBattingNumberChange(team: "home" | "away", index: number, value: string) {
+    const setter = team === "home" ? setHomeBatting : setAwayBatting;
+    setter((prev) => prev.map((row, i) => (i === index ? { ...row, numberText: value } : row)));
+  }
+
+  function resolvePlayerByNumber(roster: { id: number; number: number }[], typed: string) {
+    const typedNum = Number(typed);
+    return roster.find((p) => p.number === typedNum) ?? null;
+  }
+
+  function handleBattingNumberBlur(team: "home" | "away", index: number) {
+    const data = initialDataQuery.data;
+    if (!data) return;
+    const roster = team === "home" ? data.homePlayers : data.awayPlayers;
+    const rows = team === "home" ? homeBatting : awayBatting;
+    const setter = team === "home" ? setHomeBatting : setAwayBatting;
+    const typed = rows[index].numberText.trim();
+
+    if (typed === "") {
+      setter((prev) => prev.map((r, i) => (i === index ? { ...r, line: { ...r.line, player_id: 0 } } : r)));
+      return;
+    }
+    const match = resolvePlayerByNumber(roster, typed);
+    if (match) {
+      setter((prev) => prev.map((r, i) => (i === index ? { ...r, line: { ...r.line, player_id: match.id } } : r)));
+      return;
+    }
+    const proceed = window.confirm(`找不到背號 ${typed} 的球員，確定要繼續嗎？`);
+    setter((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? proceed
+            ? { ...r, line: { ...r.line, player_id: 0 } }
+            : { ...r, numberText: "", line: { ...r.line, player_id: 0 } }
+          : r,
+      ),
+    );
+  }
+
+  function handleAddBattingRow(team: "home" | "away") {
+    const setter = team === "home" ? setHomeBatting : setAwayBatting;
+    setter((prev) => [...prev, blankBattingRow()]);
   }
 
   function handlePitchingChange(
@@ -147,12 +185,46 @@ export function ScoreEntryPage() {
     value: number | string | boolean,
   ) {
     const setter = team === "home" ? setHomePitching : setAwayPitching;
-    setter((prev) => prev.map((line, i) => (i === index ? { ...line, [field]: value } : line)));
+    setter((prev) => prev.map((row, i) => (i === index ? { ...row, line: { ...row.line, [field]: value } } : row)));
+  }
+
+  function handlePitchingNumberChange(team: "home" | "away", index: number, value: string) {
+    const setter = team === "home" ? setHomePitching : setAwayPitching;
+    setter((prev) => prev.map((row, i) => (i === index ? { ...row, numberText: value } : row)));
+  }
+
+  function handlePitchingNumberBlur(team: "home" | "away", index: number) {
+    const data = initialDataQuery.data;
+    if (!data) return;
+    const roster = team === "home" ? data.homePlayers : data.awayPlayers;
+    const rows = team === "home" ? homePitching : awayPitching;
+    const setter = team === "home" ? setHomePitching : setAwayPitching;
+    const typed = rows[index].numberText.trim();
+
+    if (typed === "") {
+      setter((prev) => prev.map((r, i) => (i === index ? { ...r, line: { ...r.line, player_id: 0 } } : r)));
+      return;
+    }
+    const match = resolvePlayerByNumber(roster, typed);
+    if (match) {
+      setter((prev) => prev.map((r, i) => (i === index ? { ...r, line: { ...r.line, player_id: match.id } } : r)));
+      return;
+    }
+    const proceed = window.confirm(`找不到背號 ${typed} 的球員，確定要繼續嗎？`);
+    setter((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? proceed
+            ? { ...r, line: { ...r.line, player_id: 0 } }
+            : { ...r, numberText: "", line: { ...r.line, player_id: 0 } }
+          : r,
+      ),
+    );
   }
 
   function handleAddPitcher(team: "home" | "away") {
     const setter = team === "home" ? setHomePitching : setAwayPitching;
-    setter((prev) => [...prev, { ...blankPitchingLine(), seq: prev.length + 1 }]);
+    setter((prev) => [...prev, { line: { ...blankPitchingLine(), seq: prev.length + 1 }, numberText: "" }]);
   }
 
   function handleRemovePitcher(team: "home" | "away", index: number) {
@@ -184,10 +256,10 @@ export function ScoreEntryPage() {
     setSaving(true);
     setActionError(null);
     try {
-      const homeLines = [...homeBatting.values()].filter((l) => l.pa > 0);
-      const awayLines = [...awayBatting.values()].filter((l) => l.pa > 0);
-      const homeP = homePitching.filter((l) => l.player_id);
-      const awayP = awayPitching.filter((l) => l.player_id);
+      const homeLines = homeBatting.map((r) => r.line).filter((l) => l.player_id > 0 && l.pa > 0);
+      const awayLines = awayBatting.map((r) => r.line).filter((l) => l.player_id > 0 && l.pa > 0);
+      const homeP = homePitching.map((r) => r.line).filter((l) => l.player_id > 0);
+      const awayP = awayPitching.map((r) => r.line).filter((l) => l.player_id > 0);
 
       await Promise.all([
         putBattingLines(game.id, game.home_team_id, homeLines),
@@ -239,10 +311,10 @@ export function ScoreEntryPage() {
 
   const { homeTeam, awayTeam, homePlayers, awayPlayers } = initialDataQuery.data;
 
-  const homeBattingArr = [...homeBatting.values()];
-  const awayBattingArr = [...awayBatting.values()];
-  const awayPitchingOuts = awayPitching.reduce((s, l) => s + (l.outs || 0), 0);
-  const homePitchingOuts = homePitching.reduce((s, l) => s + (l.outs || 0), 0);
+  const homeBattingArr = homeBatting.map((r) => r.line);
+  const awayBattingArr = awayBatting.map((r) => r.line);
+  const awayPitchingOuts = awayPitching.reduce((s, r) => s + (r.line.outs || 0), 0);
+  const homePitchingOuts = homePitching.reduce((s, r) => s + (r.line.outs || 0), 0);
   const homeCheck = computeRLobPo(homeBattingArr, lineScore.home_lob ?? 0, awayPitchingOuts);
   const awayCheck = computeRLobPo(awayBattingArr, lineScore.away_lob ?? 0, homePitchingOuts);
 
@@ -270,14 +342,19 @@ export function ScoreEntryPage() {
       <h2 className="mt-6 mb-2 text-lg font-semibold text-foreground">{awayTeam.name}（客隊）打擊</h2>
       <BattingGrid
         players={awayPlayers}
-        lines={awayBatting}
-        onChange={(id, field, value) => handleBattingChange("away", id, field, value)}
+        rows={awayBatting}
+        onChange={(i, field, value) => handleBattingChange("away", i, field, value)}
+        onNumberChange={(i, v) => handleBattingNumberChange("away", i, v)}
+        onNumberBlur={(i) => handleBattingNumberBlur("away", i)}
+        onAddRow={() => handleAddBattingRow("away")}
       />
       <h2 className="mt-6 mb-2 text-lg font-semibold text-foreground">{awayTeam.name} 投手</h2>
       <PitchingGrid
         players={awayPlayers}
-        lines={awayPitching}
+        rows={awayPitching}
         onChange={(i, field, value) => handlePitchingChange("away", i, field, value)}
+        onNumberChange={(i, v) => handlePitchingNumberChange("away", i, v)}
+        onNumberBlur={(i) => handlePitchingNumberBlur("away", i)}
         onAddPitcher={() => handleAddPitcher("away")}
         onRemovePitcher={(i) => handleRemovePitcher("away", i)}
       />
@@ -285,14 +362,19 @@ export function ScoreEntryPage() {
       <h2 className="mt-6 mb-2 text-lg font-semibold text-foreground">{homeTeam.name}（主隊）打擊</h2>
       <BattingGrid
         players={homePlayers}
-        lines={homeBatting}
-        onChange={(id, field, value) => handleBattingChange("home", id, field, value)}
+        rows={homeBatting}
+        onChange={(i, field, value) => handleBattingChange("home", i, field, value)}
+        onNumberChange={(i, v) => handleBattingNumberChange("home", i, v)}
+        onNumberBlur={(i) => handleBattingNumberBlur("home", i)}
+        onAddRow={() => handleAddBattingRow("home")}
       />
       <h2 className="mt-6 mb-2 text-lg font-semibold text-foreground">{homeTeam.name} 投手</h2>
       <PitchingGrid
         players={homePlayers}
-        lines={homePitching}
+        rows={homePitching}
         onChange={(i, field, value) => handlePitchingChange("home", i, field, value)}
+        onNumberChange={(i, v) => handlePitchingNumberChange("home", i, v)}
+        onNumberBlur={(i) => handlePitchingNumberBlur("home", i)}
         onAddPitcher={() => handleAddPitcher("home")}
         onRemovePitcher={(i) => handleRemovePitcher("home", i)}
       />
